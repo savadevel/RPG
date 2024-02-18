@@ -1,0 +1,258 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Форма 0409136. Резервы (ежемесячная).</title>
+
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"/>
+    
+    <script src="../js/utils.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    [%- BLOCK is_equal -%]
+        [%- FOREACH key = fields.keys.sort -%]
+            [%- THROW undef IF curr.item(fields.$key) != next.item(fields.$key) -%]
+        [%- END -%]        
+    [%- END -%]
+    
+    [% BLOCK get_row %] 
+        [%- ver = [] -%]       
+        [%- FOREACH row = data -%]                    
+            [%- TRY -%]                  
+                [%- ver.push(row.$val) -%]                
+                [%- PROCESS is_equal curr=row next=loop.next -%]
+            [%- CATCH %]                        
+                new [% type %]([%- FOREACH key = fields.keys.sort -%]'[%- row.item(fields.$key).replace('\'', '"') -%]',[%- END -%]{[% ver.join(':1,') %]:1})
+                [%- ',' IF loop.next != undef %]
+                [%- ver = [] %]
+            [%- END -%]            
+        [%- END -%]
+    [%- END -%]
+
+    <script language="JavaScript" type="text/JavaScript">
+        FORMAT_OF_DATE = '[% dformat %]';
+        var oRequest   = new CWaitServerRespond();
+
+        function depart(id, name, dep, type, ver)
+        {
+            this.name = name;
+            this.id   = id;
+            this.type = type;
+            this.dep  = dep;
+            this.hVer = ver;
+        }
+
+        function app(id, name, note, ver)
+        {
+            this.name = name;
+            this.note = note;
+            this.id   = id;
+            this.hVer = ver;
+        }
+        
+        function outto(id, select, type, target, note)
+        {            
+            this.id     = id;
+            this.select = select;
+            this.hType  = type;
+            this.target = target;
+            this.note   = note;            
+        }
+
+        var aDeparts = 
+            [
+            // [% PROCESS get_row type='depart' data=dictionaries.GET_DEPARTS fields={'1'=>'id', '2'=>'name', '3'=>'dep', '4'=>'type'} val='rowver' %]
+            ];
+        
+        var aApps    = 
+            [                                     
+            // [% PROCESS get_row type='app' data=dictionaries.GET_APPS fields={'1'=>'id', '2'=>'name', '3'=>'note'} val='rowver' %]
+            ];
+        
+        var aOutTo   =
+            [
+                new outto('html',    1, {1:1,0:1}, '_blank', 'HTML (в Internet Explorer) (*.html)'),
+                new outto('kliko',   0, {1:1,0:1},   '',       'Клико (*.zip)'),
+                new outto('reserve', 0, {1:1},   '',       'ТПК "Резерв" (*.zip)')
+            ];
+        
+        function SetRowver(ver)
+        {
+            ver.checked = true;
+        
+            var optDep = frmMain.lstDep.options;
+            var optOut = frmMain.lstOutTo.options;
+
+            optDep.length = 0;
+            optOut.length = 0;
+
+            for (var i = 0; i < aDeparts.length; i++)
+            {
+                if (!aDeparts[i].hVer[ver.value]) continue;
+                optDep[optDep.length] = new Option(aDeparts[i].name, aDeparts[i].id);
+                optDep[optDep.length - 1].selected = 1;
+            }
+            
+            for (var i = 0; i < aOutTo.length; i++)
+            {
+                if (!aOutTo[i].hType[ver.is_fix]) continue;
+                optOut[optOut.length] = new Option(aOutTo[i].note, aOutTo[i].id);                
+                optOut[optOut.length - 1].selected    = aOutTo[i].select;
+                optOut[optOut.length - 1].form_target = aOutTo[i].target;
+
+                if (aOutTo[i].select)
+                    frmMain.target = aOutTo[i].target;
+            }
+            
+            var tbody = tabApps.getElementsByTagName('TBODY').item(0);
+            var template, objNewRow;
+            
+            while (tbody.firstChild)
+            {    
+                if (tbody.firstChild.style.display == 'none') template = tbody.firstChild;
+                tbody.removeChild(tbody.firstChild);
+            }
+
+            tbody.appendChild(template);
+
+            for (var i = 0; i < aApps.length; i++)
+            {
+                if (!aApps[i].hVer[ver.value]) continue;
+
+                objNewRow  = template.cloneNode(true);
+                tbody.appendChild(objNewRow);
+
+                for (var item in aApps[i])
+                {
+                    var obj = objNewRow.all[item];
+
+                    if (!obj) continue;
+
+                    if (obj.tagName.toUpperCase() == 'INPUT')
+                    {
+                        obj.value   = aApps[i][item];
+                        obj.checked = 1;
+                    }
+                    else
+                    {
+                        obj.innerHTML = aApps[i][item];
+                    }
+                }                
+                
+                objNewRow.style.display = '';
+            }
+        }
+        
+        function SetStayOfListDep(iStay)
+        {
+            for (var i = frmMain.lstDep.options.length; i > 0; i--)
+                frmMain.lstDep.options[i - 1].selected=iStay;
+        }
+        
+        function FormValidation(form, checker)
+        {
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+    
+            // блокирование кнопки, пока сервер не выполнит запрос
+            oRequest.start(form, function() {form.btnExecute.disabled = false;})
+            form.btnExecute.disabled = true;
+        }
+        
+        function init() 
+        {
+            if (!frmMain.lstRowver) return;
+            SetRowver(frmMain.lstRowver.length ? frmMain.lstRowver[1] : frmMain.lstRowver);
+        }   
+    
+        window.onload = init;
+
+    </script>
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class="body">
+
+<div class="page" style="margin-top:10">
+<!-- основной кусок -->
+    <form name=frmMain onsubmit="return false;" action="" method=post target=_blank>
+        <fieldset class='main' style='margin-top:0'><legend class='main'>Параметры генерации формы:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>
+<!-- установка подразделений -->                            
+                <fieldset><legend>Подразделения:</legend>
+                    <table>
+                    <tr><td valign='middle' align='center' colspan='2'>
+<!-- список подразделений -->
+                            <select multiple size='22' name='lstDep' style='width: 80%'> 
+                            </select>                   
+                        </td>
+                    </tr>
+                    <tr><td valign=middle align=right width="50%">
+<!-- управление списком -->                        
+                            <input style="padding-right:5px" id=btnSelectAll onclick=SetStayOfListDep(true); type=button value="Выбрать всё" name=btnSelectAll> 
+                        </td>
+                        <td valign=middle align=left width="50%">
+                            <input style="padding-left:5px" id=btnDeselectAll onclick=SetStayOfListDep(false); type=button value="Исключить всё" name=btnDeselectAll> 
+                        </td>
+                    </tr>
+                    </table>
+                </fieldset>
+                </td>
+
+                <td width='60%' valign='top'>
+<!-- -->
+                    <fieldset><legend>Версии формы:</legend><div style='overflow: auto;height: 80px;width:350px'> 
+                    <table id='tabRowver' class='slim'>
+                        <colgroup><col width=15 align='center'>
+                        <colgroup><col width=130 align='center'>
+                        <colgroup><col width=150 align='left'>
+                        [%- FOREACH item = dictionaries.GET_ROWVER %]
+                        <tr><td><input onclick='SetRowver(this)' name='lstRowver' is_fix='[% item.is_fix %]' is_curr='[% item.is_curr %]' type='radio' value='[% item.rowver %]'></td><td>[% date2str(item.ldate, 'date') %] - [% date2str(item.rdate, 'date') %]</td><td>[% item.label %]</td></tr>
+                        [%- END %]
+                    </table>
+                    </div></fieldset>
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>
+<!-- выбор приложений -->                   
+                    <fieldset><legend>Приложения:</legend><div style='overflow: auto;height: 200px'>
+                        <table id='tabApps' class='slim'>
+                            <colgroup><col width=10 align='center'>
+                            <colgroup><col width=90 align='left'>
+                            <tr style='display:none'><td><input id='id' name='chkApp' type="checkbox"></td><td><span id='name' style='font-weight:bold'></span>&nbsp;<span id='note' style='font-size:70%'></span></td></tr>
+                            <tr style='display:none'><td><input id='id' name='chkApp' type="checkbox"></td><td><span id='name' style='font-weight:bold'></span>&nbsp;<span id='note' style='font-size:70%'></span></td></tr>
+                        </table>
+                    </div></fieldset>
+                </td>
+                </tr>
+                <tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+    <!-- выбор, куда экспортировать -->
+                    <table>
+                        <tr><td width='100%' align='left' valign='bottom'>
+                            Экспортировать в:
+                            <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmMain.target=this.options[this.selectedIndex].form_target;">
+                            </select>
+                        </td></tr>
+                    </table>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(frmMain, frmMain.checker);">
+        </p>
+    </form>
+    
+    <script>
+        frmMain.checker = new FormChecker();  
+        frmMain.checker.AddRule('TheSelectItemMore',  frmMain.lstDep, {selected:1}, 'Ошибка, нужно выбрать хотя бы одно подразделение');
+        frmMain.checker.AddRule('TheCheckedItemMore', frmMain.chkApp, {checked:1},  'Ошибка, нужно выбрать хотя бы одно приложение');        
+    </script>
+    
+</div>      
+</div>
+</body></html>

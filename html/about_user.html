@@ -1,0 +1,194 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>[% title %]</title>
+    
+    <script src="../js/utils.js" type="text/javascript"></script>   
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/tabs.js" type="text/javascript"></script>       
+    <script src="../js/show_table_data.js" type=text/javascript></script>
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    
+    <script type="text/javascript">
+
+    var LV_TABLE_PERMISSIONS, LV_TABLE_IP;
+
+    function init() 
+    {
+       var tabs = new CTabs('test', {parent:mng_tabs})
+
+       tabs.Add('Права',          {select:true,  page:see_permissions});
+       tabs.Add('О Пользователе', {select:false, page:see_about_user});
+
+        LV_TABLE_PERMISSIONS = new CTableData(table_permissions, {}); 
+        LV_TABLE_PERMISSIONS.ReDraw();
+
+        LV_TABLE_IP = new CTableData(table_ip, {}); 
+        LV_TABLE_IP.ReDraw();        
+    }
+
+    window.onload = init;     
+
+    </script>
+
+    <style type="text/css">
+        table.nice
+        {
+            width:100%;
+            table-layout:fixed;
+            border-spacing:2;
+        }
+
+        table.nice td
+        {
+            font-size:75%;
+        }    
+
+        table.nice th
+        {
+            color:white;
+            background-color:#000066;
+            font-weight:normal;
+            text-align:center;
+        }
+
+        table.header 
+        {
+            background-color:#00468C;         
+            width:100%;
+            text-align:left;
+        }
+
+        table.header th
+        {
+            color:white;
+            font-weight:bold;
+            font-family:tahoma;
+            text-align:left;
+            padding-left:10;
+        }
+
+        table.user
+        {
+            width:100%;
+            table-layout:fixed;
+        }
+
+        table.user td
+        {
+            text-align:left;
+        }
+    </style>
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class='body' style='margin:1 0 0 5'>
+    <table class='header' cellpadding='0' cellspacing='0'>
+        <tr>
+            <td valign='top' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+            <td valign='top' width='100%'>
+                <img src='../img/0.gif' height='1' width='800px'/><br/>
+                <table cellpadding='0' cellspacing='0' style='margin:10 0 0 0'>
+                    <tr><th>Ресурс:</th><th>[% dictionary.GET_REPORT.0.name %]</th></tr>
+                    <tr><th>Пользователь:</th><th>[% dictionary.GET_USER.0.name %]</th></tr>                
+                </table>
+            </td>
+            <td valign='top' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+        </tr>
+        <tr>
+            <td valign='bottom' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+            <td align='center' valign='bottom' width='100%'>
+                <div class='page' id="mng_tabs" style='margin:10 0 0 0;'></div>
+            </td>
+            <td valign='bottom' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+        </tr>
+    </table>    
+    <div class='page' id="see_permissions" style='display:none;margin: 0 0 0 0;background-color:#EEEEEE;padding:5'>        
+        <table class='nice' id='table_permissions'>
+
+            <colgroup><col width=130 align='left'>
+            <colgroup><col align='left'>
+            <colgroup><col width=135 align='center'>        
+            <colgroup><col width=135 align='center' >                
+
+            <thead>
+                <tr>
+                    <th rowspan='2'>Консоль</th>
+                    <th rowspan='2'>Описание</th>
+                    <th colspan='2'>Доступ</th>
+                </tr>
+                <tr>
+                    <th>Пользовательский</th>                    
+                    <th>Административный</th>                    
+                </tr>
+            </thead>
+            <tbody>
+[% FOREACH row = dictionary.GET_REPORTS %]
+    <tr><td>[%row.name%]</td><td>[%row.note%]</td><td>[%row.reading%]</td><td>[%row.writing%]</td></tr>
+[% END %]
+            </tbody>            
+        </table>
+    </div>                                                                                       
+
+    <div class='page' id="see_about_user"  style='display:none;margin: 0 0 0 0;background-color:#EEEEEE;padding:5;'>
+        <table class='user'>
+            <colgroup><col width=120  align='left'>
+            <colgroup><col align='left'>
+            <colgroup><col width=80 align='left'>        
+            <colgroup><col align='left'>                
+            <tr>
+                <td>Логин:</td><td><span class='value_on'>[% dictionary.GET_USER.0.login %]</span></td>
+                <td>Домен:</td><td><span class='value_on'>[% dictionary.GET_USER.0.domain %]</span></td>
+            </tr>
+            <tr>
+                <td>ФИО:</td>
+                <td colspan=3><span class='value_on'>[% dictionary.GET_USER.0.fname %] [% dictionary.GET_USER.0.mname %] [% dictionary.GET_USER.0.lname %]</span></td>
+            </tr>
+            <tr><td colspan=4> <!-- --></td></tr>
+            <tr>
+                <td colspan=4>
+                    IP машин, с которых разрешен доступ:<br>
+                    <div style='border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto;height:60px;padding:3 5 3 5;margin:5 0 5 0'>
+                    <table class='nice' id='table_ip'>
+[% FOREACH row = dictionary.GET_IP %]
+    <tr><td>[%row.number%]</td>
+[% END %]
+                    </table>
+                    </div>
+                </td>
+            </tr>
+            <tr><td colspan=4> <!-- --></td></tr>
+            <tr><td colspan=4> <!-- --></td></tr>
+            <tr>
+                <td>Подразделение:</td>
+                <td colspan=3><span class='value_on'>[% dictionary.GET_USER.0.department %]</span></td>
+            </tr>
+            <tr>
+                <td>Должность:</td>
+                <td colspan=3><span class='value_on'>[% dictionary.GET_USER.0.position %]</span></td>
+            </tr>
+            <tr>
+                <td>Телефон:</td><td><span class='value_on'>[% dictionary.GET_USER.0.phone %]</span></td>
+                <td>Факс:</td><td><span class='value_on'>[% dictionary.GET_USER.0.fax %]</span></td>
+            </tr>
+            <tr><td colspan=4> <!-- --></td></tr>
+            <tr><td colspan=4> <!-- --></td></tr>
+            <tr>
+                <td colspan=4>Описание:</td>
+            </tr>
+            <tr>
+                <td colspan=4><span class='value_on' style='height:50'>[% dictionary.GET_USER.0.note %]</span></td>
+            </tr>
+        </table>
+    </div>
+
+</div>
+
+</div>
+</body>
+</html>

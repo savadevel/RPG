@@ -1,0 +1,25 @@
+<BD_CONNECT_STR> = dbi:ODBC:Develop#    
+<BD_USER>        = rpg_develop#
+<BD_PASS>        = #
+
+<SQL_GET_SETT>    = select * from rpg_develop.vw_rpg_settings where is_curr = 1 and report in (select child.report from rpg_develop.rpg_dic_reports root join rpg_develop.rpg_dic_reports child on child.lkey <= root.lkey and child.rkey >= root.rkey where root.report = '%s')
+<PRC_CREATE_SID>  = rpg_develop.pr_rpg_create_sid
+<PRC_CLOSE_SID>   = rpg_develop.pr_rpg_close_sid
+
+<DBI_PRINT_ERROR> = Y  #
+<DBI_AUTO_COMMIT> = Y  #
+<DBI_RAISE_ERROR> = Y  #
+
+<PATH_LOG>    = ../logs/#
+<LOG_TO_DB>   = Y
+<DEBUG_LEVEL> = 3#
+
+<TT2_INCLUDE_PATH> = /html/admin/:/html/:/html/lib/:/html/reports/F136/:/html/reports/F136/lib/:/html/reports/Spravochniks/:/html/reports/Spravochniks/lib/:/cgi/reports/F136/templates/kliko/:/cgi/reports/F136/templates/reserve/
+
+<TT2_INTERPOLATE>  = 0
+<TT2_PRE_PROCESS>  = 
+<TT2_POST_PROCESS> =
+<TT2_TAG_STYLE>    = template
+<TT2_DEBUG>        =
+
+

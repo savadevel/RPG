@@ -1,0 +1,599 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Управление справочниками. Административная консоль.</title>
+        <link href="../css/Spravochniks.css"  type=text/css rel=stylesheet >    
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>
+    <script src="../js/calendar/calendar.js" type="text/javascript"> </script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+    <script src="../js/dialog.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    [%- BLOCK put_rowver -%]
+        [%- FOREACH item = dictionaries.GET_ROWVER %]
+            [% item.rowver -%]:{label:'[% PROCESS txt2html text=item.label %]', parent:'[% PROCESS txt2html text=item.parent %]', cdate:'[% date2str(item.cdate, 'date') %]', edate:'[% date2str(item.edate, 'date') %]', is_fix:[% item.is_fix%], note:'[% PROCESS txt2html text=item.note %]', is_base:[% item.is_base %], is_curr:[% item.is_curr %]} [%- ',' IF loop.next != undef %]
+        [%- END -%]        
+    [%- END -%]
+     
+    <script type="text/javascript">               
+        FORMAT_OF_DATE = '[% dformat %]';        
+
+        var oCalendar = null; 
+        var oRequest  = new CWaitServerRespond();        
+        var hRowver   =
+        {
+        // [% PROCESS put_rowver %]
+        };
+
+        function SetRowver(obj, rowver) 
+        {
+            var aObj =
+            [
+                {obj:frmRowver.chkIsFix,        type:'checkbox',   from:'is_fix',   change:false},
+                {obj:frmRowver.chkIsCurr,       type:'checkbox',   from:'is_curr',  change:true},
+                {obj:lblRowverDateCreate,       type:'label',      from:'cdate',    change:null},
+                {obj:lblRowverDateEnd,          type:'label',      from:'edate',    change:null},                
+                {obj:lblRowverName,             type:'label',      from:'label',    change:null},
+                {obj:lblRowverParentName,       type:'label',      from:'parent',   change:null},
+                {obj:frmRowver.edtNote,         type:'editbox',    from:'note',     change:false},
+                {obj:frmRowver.btnDelete,       type:'btn_delete', from:'is_base',  change:false}
+            ];
+           
+            for (var i = 0; i < aObj.length; i++)
+            {                   
+                aObj[i].obj.disabled  =  ((aObj[i].change == null)? aObj[i].obj.disabled : aObj[i].change ? false : hRowver[rowver].is_fix);
+                
+                switch(aObj[i].type)
+                {
+                    case 'editbox':
+                        aObj[i].obj.value                 = hRowver[rowver][aObj[i].from];
+                        aObj[i].obj.style.backgroundColor = ((aObj[i].change == null) ? aObj[i].obj.style.backgroundColor : (aObj[i].change || !hRowver[rowver].is_fix)? '#FFFFFF' : '#CCCCCC');
+                        break;
+
+                    case 'label':
+                        aObj[i].obj.innerHTML             = hRowver[rowver][aObj[i].from];
+                        break;
+
+                    case 'checkbox':
+                        aObj[i].obj.checked = hRowver[rowver][aObj[i].from];                        
+                        break;
+                        
+                    case 'btn_delete':
+//                        aObj[i].obj.disabled = hRowver[rowver][aObj[i].from];
+                        break;
+                        
+                    default:
+                        break;
+                }
+            }
+
+            try
+            {
+                obj.checked  = true;
+            }
+            catch(e)
+            {
+            }
+
+            frmRowver.rowver = rowver;
+        }
+
+        function FormRowverValidation(from, checker)
+        {
+            var form = from.form;
+
+            if (form.sent) return;
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+
+            var sMsg   = '';
+            var rowver = frmRowver.rowver;
+
+            if (!rowver) 
+            {
+                alert('Ошибка, нужно выбрать версию');
+                return;
+            }
+
+            if (from.name == 'btnDelete')
+            {
+                sMsg += "Внимание, будет удалена версия '" + hRowver[rowver].label + "', продолжить?";
+            }
+            else
+            {            
+                sMsg += "Внимание, будут установлены следующие параметры версии '" + lblRowverName.innerHTML + "':";
+                sMsg += '\n   - ' + (form.chkIsCurr.checked ? 'сделать версию текущей' : 'версия не текущая');
+                
+                if (hRowver[rowver].is_fix == 0)
+                {
+                    sMsg += '\n   - ' + (form.chkIsFix.checked ? 'зафиксировать версию' : 'не фиксировать версию');
+                    sMsg += '\n   - описание \'' + form.edtNote.value + '\''; 
+                }
+
+                sMsg += '\n\nВы уверены, что хотите продолжить?';
+            }        
+            
+            if(window.confirm(sMsg))
+            {
+                AddUnCheck(form, form.chkIsCurr);
+
+                form.submit();
+                form.btnEdit.disabled   = true;
+                form.btnCreate.disabled = true;
+                form.btnDelete.disabled = true;
+
+                form.sent = true;
+            }
+        }
+
+        function AddUnCheck(frm, chk)
+        {
+            if (chk.checked) return;
+
+            var obj = document.createElement('input');
+
+            obj.name  = chk.name;
+            obj.value = 0;
+            obj.type  = 'hidden';
+            frm.appendChild(obj);
+        }
+        
+        // работа с меню        
+        function TurnBlock(strID)
+        {   
+            var arr = document.getElementsByTagName('div');
+            
+            for (var i = 0; i < arr.length; i++) 
+            {
+                if (arr[i].className == 'page') 
+                {
+                    arr[i].style.display = 'none';
+                } 
+            } 
+
+            document.getElementById(strID).style.display = 'block';
+        }
+
+        function CreateMenu() 
+        {
+            var mCalendar = new jsDOMenu(128, "absolute");
+            
+            with (mCalendar) 
+            {
+                addMenuItem(new menuItem("редактирование", "", "code:TurnBlock('query_calendar');"));
+            }
+
+            var mDeparts = new jsDOMenu(128, "absolute");
+            
+            with (mDeparts) 
+            {
+                addMenuItem(new menuItem("редактирование", "", "code:TurnBlock('query_departs');"));
+            }
+
+            var mClearing = new jsDOMenu(180, "absolute");
+            
+            with (mClearing) 
+            {
+                addMenuItem(new menuItem("редактирование кодов",  "", "code:TurnBlock('query_clr_codes');"));
+                addMenuItem(new menuItem("редактирование курсов", "", "code:TurnBlock('query_clr_rate');"));
+            }
+
+            var mRowver = new jsDOMenu(128, "absolute");
+            
+            with (mRowver) 
+            {
+                addMenuItem(new menuItem("редактирование",  "", "code:TurnBlock('query_rowver');"));
+            }
+            
+            var mRoot = new jsDOMenuBar("absolute", "", false);
+
+            with (mRoot) 
+            {
+                addMenuBarItem(new menuBarItem("Календарь",     mCalendar));
+                addMenuBarItem(new menuBarItem("Подразделения", mDeparts));
+                addMenuBarItem(new menuBarItem("Клиринг",       mClearing));
+                addMenuBarItem(new menuBarItem("Версии",        mRowver));
+                moveTo(0, 0);
+            }          
+        }   
+        
+        function SetStayOptionOfList(list, iStay)
+        {
+            if (list.disabled) return;
+            for (var i = list.options.length; i > 0; i--)
+                list.options[i - 1].selected=iStay;
+        }
+        
+        function FormValidation(form, checker, question)
+        {
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+
+            if (question && !window.confirm(question))     return;
+
+            // блокирование кнопки, пока сервер не выполнит запрос
+            oRequest.start(form, function() {form.btnExecute.disabled = false;})
+            form.btnExecute.disabled = true;
+        }        
+        
+        function init() 
+        {
+            InitMenu();
+            TurnBlock('query_rowver');
+            
+            oCalendar = new CCalendar('Calendar', {});
+
+            var obj;
+            var aLstRowver = [];
+            var aLstLabels = [];
+            
+            for (var i = 0; obj = document.getElementsByName('lstRowver').item(i);i++)
+            {
+                aLstRowver[i] = {name:hRowver[obj.id].label, 
+                                 id:obj.id};
+                aLstLabels[i] = hRowver[obj.id].label;  
+                if (obj.checked == true) SetRowver(obj, obj.id);
+            }                       
+
+// [%  IF checkin %]            
+            dlgCraete = new MyDialog('frmCreateVer', {desc:'Создание новой версии', height:250, width:525, owner:frmRowver.parentNode});
+
+            dlgCraete.AddObject('hidden',  {id:'exe', val:'CREATE'});
+            dlgCraete.AddObject('hidden',  {id:'page', val:'ROWVER'});
+
+            dlgCraete.AddObject('label', {val:'Список родительских версий:', width:200, top:15});
+            dlgCraete.AddObject('list',  {id:'lstParentRowver', val:aLstRowver,  width:200, size:8});
+
+            dlgCraete.AddObject('label', {val:'Имя версии:', width:90, top:40, left:220});
+            dlgCraete.AddObject('edit',  {id:'edtLabel',  val:'', align:'left', width:202, top:40, left:310});
+
+            dlgCraete.AddObject('label', {val:'Описание версии:', width:150, top:70, left:220});
+            dlgCraete.AddObject('text',  {id:'edtNote', val:'',   width:293, height:78});
+
+            dlgCraete.AddObject('button',  {id:'btn', val:'Создать', width:80, top:190, left:433,
+                                            exe:function()
+                                            {
+                                                var chkCreate = new FormChecker();
+                                                var form      = document.forms['frmCreateVer'];
+
+                                                chkCreate.AddRule('TheSelectItemMore',  form.lstParentRowver, {selected:1}, 'Ошибка, нужно выбрать родительскую версию');                                                
+                                                chkCreate.AddRule('TheTextIsNotEmpty',  form.edtLabel,  {},           'Ошибка, не указано имя версии');
+                                                chkCreate.AddRule('TheContentIsNot',    form.edtLabel,  {value:hRowver, item:'label'},           'Ошибка, название версии должно быть уникально'); 
+
+                                                if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+                                                if (!window.confirm("Будет создана версия '" + form.edtLabel.value + "', продолжить?")) return;
+
+                                                form.submit();
+
+                                                dlgCraete.Hide();
+
+                                                frmRowver.btnEdit.disabled   = true;
+                                                frmRowver.btnCreate.disabled = true;
+                                                frmRowver.btnDelete.disabled = true;
+                                            }});
+// [% END %]
+        }
+
+        window.onload = init; 
+    </script>
+</head>
+
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class="body">
+
+<!-- просмотр-редактирование версий -->
+<div class="page" id="query_rowver" style="display:none">
+<!-- основной кусок -->
+    
+    <form name=frmRowver onsubmit="return false;" action="" method=post target=''>        
+        <input type=hidden value=""       name="exe">
+        <input type=hidden value="ROWVER" name="page">
+
+        <fieldset class='main' style='margin-top:0;text-align:left;width:100%;height:350px'>
+            <legend class='main'>История изменений:</legend>
+            <table><tr><td width='35%' valign='top'>
+        <!-- список версий -->
+                    <fieldset>
+                        <legend>Список версий:</legend>
+                        <div style='display:block;margin:5px 0 5px 0;height:270px;border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto'>
+                            <table class='slim'>
+                            [%- FOREACH item = dictionaries.GET_ROWVER %]
+                                <tr valign='top' onclick='SetRowver(frmRowver.lstRowver[this.rowIndex], [% item.rowver %])'>
+                                    <td width='15%'><input name='lstRowver' id=[% item.rowver %] value='[% item.rowver %]' [% 'checked' IF item.is_curr == 1 %] type='radio'/></td>
+                                    <td width='85%'>[% item.label %]</td>
+                                </tr>
+                            [% END %]
+                            </table>
+                        </div>                                
+                    </fieldset>            
+                </td>
+                
+                <td valign='top'>
+        <!-- параметры версии -->
+                <fieldset>
+                    <legend>Параметры версии:</legend>                        
+                    <table><tr>
+                        <td width="25%">
+                            Имя версии:
+                        </td>                    
+                        <td width="50%" colspan="2">            
+                            <span id='lblRowverName' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="25%">
+                            Родительская:
+                        </td>
+                        <td width="50%" colspan="2">
+                            <span id='lblRowverParentName' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Дата создания версии:
+                        </td>
+                        <td width="25%">
+                            <span id='lblRowverDateCreate' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Версия была подписана:
+                        </td>
+                        <td width="25%">
+                            <span id='lblRowverDateEnd' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Текущая версия:
+                        </td>
+                        <td width="25%">
+                            <input name='chkIsCurr' value=1 type='checkbox'>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Версия подписана:
+                        </td>
+                        <td width="25%">
+                            <input name='chkIsFix' value=1 type='checkbox'>
+                        </td>
+                    </tr><tr>
+                        <td colspan="3">
+                            <span>Описание версии:</span>
+                            <textarea name='edtNote' style='width:100%;margin-top:5px;height:107px'></textarea>                                    
+                        </td>
+                    </tr></table></fieldset></td>
+            </tr></table></fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width:128px" name="btnEdit"  type="submit" value="Применить" onClick="frmRowver.exe.value='EDIT'; FormRowverValidation(this, frmRowver.chkEdit);">
+            <input style="width:128px;margin-left:10px" name="btnDelete" type="submit" value="Удалить" onClick="frmRowver.exe.value='DELETE'; FormRowverValidation(this, frmRowver.chkDelete);">
+            <input style="width:128px;margin-left:10px" name="btnCreate" type="submit" value="Создать" onClick="dlgCraete.Show({});" [%- 'disabled' IF ! checkin %]>
+        </p>        
+    </form>        
+    
+    <script>
+        frmRowver.chkEdit   = new FormChecker();  
+        frmRowver.chkDelete = new FormChecker();  
+        
+        frmRowver.chkEdit.AddRule('TheCheckedItemMore', frmRowver.lstRowver, {checked:1}, 'Ошибка, нужно выбрать версию');        
+        frmRowver.chkDelete.AddRule('TheCheckedItemMore', frmRowver.lstRowver, {checked:1}, 'Ошибка, нужно выбрать версию'); 
+    </script>    
+</div>    
+
+<!-- выгрузка календаря -->
+<div class="page" id="query_calendar" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCalendar onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CALENDAR" name="page">
+        <input type=hidden value="EXPORT"  name="exe">
+
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку календаря:</legend>            
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top'>
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                <td width='40%' valign='bottom'>
+<!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="this.form.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCalendar.chkForm = new FormChecker();
+        
+        with(frmQueryCalendar)
+        {
+            with(chkForm)
+            {
+                edtDateRight.value = GetCurrDate();
+                edtDateLeft.value  = GetCurrDate();
+            }               
+        }
+    </script>        
+</div>      
+
+<!-- выгрузка подразделений -->
+<div class="page" id="query_departs" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryDeparts onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="DEPARTS" name="page">
+        <input type=hidden value="EXPORT"  name="exe">
+
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку подразделений Банка:</legend>            
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top'>
+                <!-- устанока периода -->               
+                    <fieldset><legend class="child">Опции выгрузки:</legend> 
+                        <table>                        
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkTypeOfDep" type="checkbox"  value = "0">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>выгрузка ГО</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkTypeOfDep" type="checkbox"  value = "1">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>выгрузка филиалов</p>
+                                </td>
+                            </tr>                               
+                        </table>
+                    </fieldset>                 
+                </td>
+                <td width='40%' valign='bottom'>
+                <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="this.form.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryDeparts.chkForm = new FormChecker();
+        
+        with(frmQueryDeparts)
+        {
+            with(chkForm)
+            {
+            }               
+        }
+    </script>        
+</div>      
+
+<!-- выгрузка кодов клиринговых операций -->
+<div class="page" id="query_clr_codes" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryClrCode onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CLR_CODES" name="page">
+        <input type=hidden value="EXPORT"  name="exe">
+
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку кодов клиринговых операций:</legend>            
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='40%' valign='bottom'>
+                <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="this.form.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryClrCode.chkForm = new FormChecker();
+        
+        with(frmQueryClrCode)
+        {
+            with(chkForm)
+            {
+            }               
+        }
+    </script>        
+</div>      
+
+<!-- выгрузка кодов клиринговых операций -->
+<div class="page" id="query_clr_rate" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryClrCurs onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CLR_RATE" name="page">
+        <input type=hidden value="EXPORT"  name="exe">
+
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку курсов клиринговых операций:</legend>            
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='40%' valign='bottom'>
+                <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="this.form.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryClrCurs.chkForm = new FormChecker();
+        
+        with(frmQueryClrCurs)
+        {
+            with(chkForm)
+            {
+            }               
+        }
+    </script>        
+</div>      
+
+
+</div>
+</body></html>

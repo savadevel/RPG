@@ -1,0 +1,8 @@
+Options -Indexes
+ExpiresActive On
+ExpiresDefault "access"
+RewriteEngine  on
+RewriteBase     /
+RewriteRule     ^$    http://rpg:8000/cgi/index.pl           [R=permanent,L]
+RewriteCond %{DOCUMENT_ROOT}/%{REQUEST_FILENAME} !-f
+RewriteRule ^/(.*)$ http://rpg:8000%{REQUEST_URI} [L,P,QSA]

@@ -1,0 +1,121 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Данные, используемые для подготовки 136 формы</title>
+
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"> 
+   
+    <script src="../js/MultiSortTable.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+    <script src="../js/utils.js" type="text/javascript"></script>
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/reports/F136/common_show_data.js" type="text/javascript"></script>
+    <script type="text/javascript">
+    
+    function CreateMenu() 
+    {
+        mTools = new jsDOMenu(128, "", "absolute");
+        
+        with (mTools) 
+        {
+            addMenuItem(new menuItem("сортировка", "", "code:ShowDialogMultiSort(document.all['show_cod'], frmShowCur.strRequest.value);"));
+        }
+      
+        mRoot = new jsDOMenuBar("absolute");
+
+        with (mRoot) 
+        {
+            addMenuBarItem(new menuBarItem("Инструменты", mTools));
+            moveTo(-1, -1);
+        }      
+    } 
+
+    function init() 
+    {
+        var table = document.all['show_cod'];
+        
+        InitMenu();
+        InitSorting(SetViewTable);             
+        SetViewTable(table);
+    }
+
+    </script>
+
+</head>
+
+<!-- [% message %] -->
+<!-- 
+[% BLOCK get_last_request -%]
+    <input type=hidden name='strRequest' value='[% request %]'>
+[% END -%]
+-->
+
+<body alink="#000099" link="#003366" vlink="#999999" onLoad="init()">
+<div class="body">
+
+<div id="table_cur" class="page"  style="display:block">
+    <form id=frmShowCur onsubmit="return false;" action="">
+        [% PROCESS get_last_request %]
+    </form>         
+
+    <table align="center" class="sort_table" id="show_cod" button='[% button_field %]'>
+    <caption style="text-align:left">
+        <div class="caption" style="width:800px;text-align:center">
+            <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                Расчет кодов за период:
+                <br>[% table.period_left %] - [% table.period_right %],
+                <br>(записей: [% table.count %])
+            </p>
+        </div>
+    </caption>
+
+    <colgroup><col width="160"  align="center">
+    <colgroup><col width="100"  align="center">
+    <colgroup><col width="80"   align="center">
+    <colgroup><col width="100"  align="right">
+    <colgroup><col width="100"  align="right">        
+    
+    <thead id="show_head">
+        <tr>
+            <th type="acc" name='code'>
+                <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                <th class="pic"><img id='sort_pic' src="../img/sort/asds.gif"></th>
+                <th class="desc" id='sort_desc'>Код</th>
+                </tr></thead></table>                
+            </th>        
+            <th type="acc" name='acc'>
+                <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                <th class="pic"><img id='sort_pic' src="../img/sort/asds.gif"></th>
+                <th class="desc" id='sort_desc'>Счет 2-го порядка</th>
+                </tr></thead></table>                
+            </th>
+            <th type="dat" name='date'>
+                <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                <th class="pic"><img id='sort_pic' src="../img/sort/asds.gif"></th>
+                <th class="desc" id='sort_desc'>Дата</th>
+                </tr></thead></table>
+            </th>
+            <th type="mny" name='bal_r'>
+                <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                <th class="pic"><img id='sort_pic' src="../img/sort/asds.gif"></th>
+                <th class="desc" id='sort_desc'>Рублевый остаток</th>
+                </tr></thead></table>
+            </th>                               
+            <th type="mny" name='bal_v'>
+                <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                <th class="pic"><img id='sort_pic'  src="../img/sort/asds.gif"></th>
+                <th class="desc" id='sort_desc'>Валютный остаток</th>
+                </tr></thead></table>
+            </th>                                               
+        </tr>
+    </thead>
+    <tbody id="show_body">
+            [% executor.get_body('SHOW_COD', ['code', 'acc', 'date', 'bal_r', 'bal_v']) %]
+    </tbody>    
+    </table>    
+</div>
+
+</div>
+</body>
+</html>

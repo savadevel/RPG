@@ -1,0 +1,543 @@
+html, body, div, p, span, img, input, a, legend, table, td, th, tr, select, input, button
+{
+    font-size: 13px;
+    color: black;
+    font-family:MS Sans Serif, Helvetica, sans-serif;   
+}
+
+html, body, input
+{
+    margin:  0;
+    padding: 0;
+    width: 100%;
+}
+
+a.mng_tree
+{
+    text-decoration: none;
+}
+
+a.mng_tree span
+{
+    font-size: 12px;
+}
+
+img
+{
+    border: 0;
+}
+
+html, body
+{
+    height: 100%;
+}
+
+div.body
+{
+    display: block;
+    width: 800px;
+}
+
+/*  Представление списка ввиде тега select */
+table.slim
+{
+    width:100%;
+    table-layout:fixed;
+    border-spacing:0.1em;
+}
+
+table.slim td
+{
+    font-size:10px;
+    background-color:#EEEEEE;
+}    
+
+table.slim input
+{
+    font-size:10px;
+}    
+
+/* блок определяет страницу, у которой можно менять display */
+div.page
+{
+    display: block;
+    width: 640;
+    margin: 50 0 10 20;
+    padding: 0;
+}
+
+/** Стили управления страницей создания запроса **/
+div.page table
+{
+    border: 0 solid #000000;
+    padding: 10px 10px 10px 10px;
+}
+
+div.page fieldset.main
+{    
+    margin-top:30px;
+    padding:10px 10px 10px 10px;
+}
+
+fieldset.main fieldset
+{    
+    padding:7px 7px 7px 7px;
+}
+
+fieldset.main table
+{
+    vertical-align:top;        
+    width:100%;
+    margin:0 0 0 0;
+    padding:5 10 0 0
+}
+
+div.page fieldset.main
+{    
+    margin-top:30px;
+    padding:10px 10px 10px 10px;
+}
+
+legend.main
+{
+    font-size: 14px;
+    font-weight: bold;
+}
+
+
+/* таблица с поддержкой сортировки */
+table.sort_table
+{
+    table-layout: fixed;
+    border-spacing:0.1em;
+    margin-bottom:1em;
+    margin-top:1em;
+}
+
+table.sort_table div.caption
+{
+    width: 640;
+    display: block;
+    padding-bottom: 20;
+    text-align:center;
+}
+
+/* оформление ячеек заголовка таблицы */
+table.sort_table thead tr th
+{           
+    padding:2px 3px 2px 3px;
+    cursor:hand;
+    background-color:#000066;
+    font-weight:bold;
+    color:#FFFFFF;      
+    text-align:center;
+    vertical-align:middle;      
+    height: 40px;      
+}
+
+/* оформление ячеек тела таблицы */
+table.sort_table tbody td
+{
+    padding:2px 3px 2px 3px;
+    font-size:11px;
+}
+
+
+table.header 
+{
+    border: 0;
+    width: 100%;  
+    height: 40px;      
+}
+
+table.header th.desc
+{
+    color:#FFFFFF;      
+    text-align:center;    
+    vertical-align:middle;   
+    padding: 0;
+    width:99%;        
+}
+ 
+table.header th.pic
+{
+    padding: 0;    
+    padding-right: 2px;    
+    vertical-align:top;
+    text-align:left;        
+}
+
+/* Пространство для размещения вкладок листания страниц */
+table.tabbed
+{
+    background-color:#00468C;         
+    width:100%;
+    text-align:left;
+}
+
+table.tabbed th
+{
+    color:white;
+    font-weight:bold;
+    font-family:tahoma;
+    text-align:left;
+    padding-left:10;
+}
+
+/* Оформление диалога */
+div.dialog
+{
+    position: absolute; 
+    top: 150px; 
+    display: none; 
+    width:95%; 
+    z-index: 66; 
+    font-size:100%;
+}       
+
+div.dialog div  
+{
+    background-color:buttonface;
+    border-style:outset;
+    border-width:2px;
+    border-color:activeborder;
+}       
+
+/** Стили меню **/
+.jsdomenudiv {
+    background-color: #CCCCCC;
+    border: 2px outset;
+    border-bottom-color: #000000;
+    border-left-color: #FFFFFF;
+    border-right-color: #000000;
+    border-top-color: #FFFFFF;
+    cursor: default;
+    position: absolute; /* Do not alter this line! */
+    visibility: hidden;
+    z-index: 10;
+}
+
+.jsdomenuitem {
+    background-color: transparent;
+    border: none;
+    color: #000000;
+    font-family: Tahoma, Helvetica, sans, Arial, sans-serif;
+    font-size: 12px;
+    padding-bottom: 2px;
+    padding-left: 22px;
+    padding-right: 15px;
+    padding-top: 2px;
+    text-align:left;
+    position: relative; /* Do not alter this line! */
+}
+
+.jsdomenuitemover {
+    background-color: #000099;
+    border: none;
+    color: #FFFFFF;
+    font-family: Tahoma, Helvetica, sans, Arial, sans-serif;
+    font-size: 12px;
+    padding-bottom: 2px;
+    padding-left: 22px;
+    padding-right: 15px;
+    padding-top: 2px;
+    text-align:left;
+    position: relative; /* Do not alter this line! */
+}
+
+.jsdomenuarrow {
+    background-image: url(../img/menu/classic_arrow.png);
+    background-repeat: no-repeat; /* Do not alter this line! */
+    height: 7px;
+    position: absolute; /* Do not alter this line! */
+    right: 8px;
+    width: 4px;
+}
+
+.jsdomenuarrowover {
+    background-image: url(../img/menu/classic_arrow_o.png);
+    background-repeat: no-repeat; /* Do not alter this line! */
+    height: 7px;
+    position: absolute; /* Do not alter this line! */
+    right: 8px;
+    width: 4px;
+}
+
+.jsdomenusep {
+}
+
+.jsdomenusep hr {
+    text-align: center;
+    width: 95%;
+}
+
+/*
+Menu bar related selectors
+*/
+.jsdomenubardiv {
+    background-color: #CCCCCC;
+    background-image: url(../img/menu/classic_divider.png);
+    background-position: left;
+    background-repeat: no-repeat;
+    border: 2px outset;
+    border-bottom-color: #000000;
+    border-left-color: #FFFFFF;
+    border-right-color: #000000;
+    border-top-color: #FFFFFF;
+    cursor: default;
+    padding-bottom: 3px;
+    padding-left: 1px;
+    padding-right: 1px;
+    padding-top: 3px;
+    position: absolute; /* Do not alter this line! */
+    visibility: visible;
+}
+
+.jsdomenubardragdiv {
+    cursor: move;
+    font-family: Tahoma, Helvetica, sans, Arial, sans-serif;
+    font-size: 12px;
+    padding-bottom: 2px;
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-top: 2px;
+    position: relative; /* Do not alter this line! */
+    visibility: hidden;
+    width: 9px;
+}
+
+.jsdomenubaritem {
+    background-color: #CCCCCC;
+    border: none;
+    color: #000000;
+    font-family: Tahoma, Helvetica, sans, Arial, sans-serif;
+    font-size: 12px;
+    padding-bottom: 2px;
+    padding-left: 22px;
+    padding-right: 10px;
+    padding-top: 2px;
+    position: relative; /* Do not alter this line! */
+}
+
+.jsdomenubaritemover {
+    background-color: #CCCCCC;
+    border: 1px outset;
+    color: #000000;
+    font-family: Tahoma, Helvetica, sans, Arial, sans-serif;
+    font-size: 12px;
+    padding-bottom: 2px;
+    padding-left: 21px;
+    padding-right: 9px;
+    padding-top: 2px;
+    position: relative; /* Do not alter this line! */
+}
+
+.jsdomenubaritemclick {
+    background-color: #000099;
+    border: 1px solid #000099;
+    color: #FFFFFF;
+    font-family: Tahoma, Helvetica, sans, Arial, sans-serif;
+    font-size: 12px;
+    padding-bottom: 2px;
+    padding-left: 21px;
+    padding-right: 9px;
+    padding-top: 2px;
+    position: relative; /* Do not alter this line! */
+}
+
+/*
+Example of selectors for icons. Change the height and width to match the actual 
+height and width of the icon image.
+*/
+.icon1 {
+    background-image: url(../img/menu/icon1.png);
+    background-repeat: no-repeat; /* Do not alter this line! */
+    height: 16px;
+    left: 2px;
+    position: absolute; /* Do not alter this line! */
+    width: 16px;
+}
+
+.icon2 {
+    background-image: url(../img/menu/icon2.png);
+    background-repeat: no-repeat; /* Do not alter this line! */
+    height: 16px;
+    left: 2px;
+    position: absolute; /* Do not alter this line! */
+    width: 16px;
+}
+
+.icon3 {
+    background-image: url(../img/menu/icon3.png);
+    background-repeat: no-repeat; /* Do not alter this line! */
+    height: 16px;
+    left: 2px;
+    position: absolute; /* Do not alter this line! */
+    width: 16px;
+}
+
+/* стили для представления вкладок */
+div.tabs 
+{
+    margin:0 0 0 0; 
+    padding:0 0 0 0; 
+    width:100%;
+    background-color:#00468C; 
+    color:white; 
+    font-size:70%; 
+    font-family:tahoma;
+    position:relative;
+    display:block;
+} 
+
+div.tabs table
+{
+    border-spacing:0;
+    width:100%;
+    padding: 0 0 0 0;
+}
+
+div.tabs table tr
+{
+    vertical-align:middle;
+}
+
+div.tabs table td.select
+{
+    cursor:hand;
+    background-color:white; 
+    text-align:center;
+    color:#013572; 
+    font-size:75%; 
+    padding-right:7px; 
+    padding-left:12px; 
+    font-family:arial;
+} 
+
+div.tabs table td.select span
+{
+    color:#013572; 
+    text-decoration:none;    
+    font-weight:bold;
+} 
+
+div.tabs table td.select span:hover
+{
+    color:#013572; 
+    text-decoration:underline;    
+    cursor:hand;
+} 
+
+div.tabs table td.unselect
+{
+    cursor:hand;
+    background-color:#5977B3; 
+    text-align:center;
+    font-size:75%; 
+    padding-right:7px; 
+    padding-left:6px; 
+    font-family:arial;
+} 
+
+div.tabs table td.unselect span
+{
+    color:white; 
+    text-decoration:none;    
+    cursor:hand;
+} 
+
+/* IE поддерживает hover только для тега A и при наличии href */
+div.tabs table td.unselect span:hover
+{
+    text-decoration:underline;
+    cursor:hand;
+} 
+
+div.tabs table td.picture
+{
+    background-color:#00468C;
+} 
+
+/* оформление ячеек таблицы ссылок на страницы */
+table.nav_table tbody td
+{
+    font-size:11px;
+    background-color:#E8EFF5;
+    cursor:hand;
+    font-weight:bold;
+    text-align:center;
+    vertical-align:middle;      
+}
+
+/* текущая страница */
+table.nav_table td.page_curr
+{
+    background-color:#000066;
+    color:#FFFFFF;      
+}
+
+/* поля имя-значение */
+span.param
+{               
+}
+
+span.value_on
+{
+    font-size:75%;
+    background-color: #ffffff;
+    border: 1 solid silver;            
+    padding: 1 5 1 5;
+    text-align:left;
+    width:100%;
+    height:20;
+    overflow-y:hidden;
+}
+
+span.value_off
+{
+    font-size:75%;
+    background-color: #CCCCCC;
+    border-style:inset;
+    border-color:#CCCCCC;
+    border-width:1px;    
+    padding: 1 5 1 5;
+    text-align:left;
+    width:100%;
+    height:20;
+    overflow-y:hidden;
+}
+
+/* оформление строк взависимости от операции */
+.row_add
+{
+    background-color:#40FF40;
+}
+
+.row_delete
+{
+    background-color:#FF4040;
+}
+
+.row_select
+{
+    background-color:#ffffcc;
+}
+
+.row_change
+{
+    background-color:#409FFF;
+}
+
+.row_load
+{    
+}    
+
+.row_odd
+{
+    background-color:#FFFFFF;
+}
+
+.row_even
+{
+    background-color:#E8EFF5;
+}

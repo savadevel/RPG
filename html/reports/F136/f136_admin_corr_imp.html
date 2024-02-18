@@ -1,0 +1,76 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>[% title %]</title>    
+
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"/> 
+    
+    <script src="../js/utils.js" type="text/javascript"></script>
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/reports/F136/common_show_corr.js" type="text/javascript"></script>    
+
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+        
+    <script type="text/javascript">    
+        function init() 
+        {   
+            var table = show_corr;            
+            var objSort, objCorr;
+
+            objCorr = new CTableCorr(table, {});
+            objSort = new CSortingOfTable(table, {});
+            objSort.AddListener('ON_AFTER_SORTING',  function () {objCorr.ReDraw()});
+        }
+        
+        window.onload = init;        
+    </script>
+    
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999" onLoad="init()">
+<div class="body">
+<div class="page">
+    <table align=left>
+        <tr><td>
+        <table align="left" style="background-color:#CCCCCC;border-style:ridge;border-width:7px;border-color:#CCCCCC;">
+            [% executor.get_body('STAT_SHORT') %]
+        </table>
+        </td></tr>
+        <tr valign=middle><td align=right>
+            <form id=frmRequest onsubmit="return false;" action="" method=post target="_self">
+                [% PROCESS make_request replace = {exe => ['EXPORT']} %]
+                <button onclick="frmRequest.submit(); this.disabled = true;">Перезапросить</button>                                
+            </form>
+        </td></tr>
+    </table>    
+</div>    
+    
+<div class="page">    
+    <table align="center" class="sort_table" id="show_corr">
+    <caption style="text-align:left">
+        <div class="caption" style="width:400px;text-align:center">
+            <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                Установленны значения           
+            </p>
+        </div>
+    </caption>
+
+    [% PROCESS get_size_fields target='STAT_FULL' %]
+
+    <thead id="show_head">
+        <tr>
+            [% PROCESS get_desc_fields target='STAT_FULL' %]
+        </tr>
+    </thead>
+    <tbody id="show_body">
+        [% executor.get_body('STAT_FULL') %]
+    </tbody>    
+    </table>    
+</div></div>
+</body>
+</html>

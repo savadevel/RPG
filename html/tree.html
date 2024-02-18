@@ -1,0 +1,57 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Отчётность</title>
+
+    <script type="text/javascript" src="../js/ua.js"></script>
+    <script type="text/javascript" src="../js/tree/tree.js"></script>
+
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+
+    <script type="text/javascript">
+<!--
+    USETEXTLINKS  = 1; //replace 0 with 1 for hyperlinks
+    STARTALLOPEN  = 1; //replace 0 with 1 to show the whole tree
+    ICONPATH      = '../img/tree/';
+    USEICONS      = 1;
+    PERSERVESTATE = 1;
+
+//  [% IF 0 %]
+        fRoot = gFld("Отчетность", "../index.htm", "root.gif", "root.gif");
+            fKred = insFld(fRoot, gFld("Кредиты", "", "parent_open.gif", "parent_closed.gif"));
+                insDoc(fKred, gLnk("L", "Ипотечные кредиты для ф.л.", "./default.htm", "report.gif"));
+                insDoc(fKred, gLnk("L", "Ипотечные кредиты для ю.л.", "./default.htm", "report.gif"));
+                insDoc(fKred, gLnk("L", "Контроль остатков на счетах", "./default.htm", "report.gif"));
+                insDoc(fKred, gLnk("L", "График платежей", "./default.htm", "report.gif"));
+            fCB   = insFld(fRoot, gFld("Отчетность перед ЦБ", "", "parent_open.gif", "parent_closed.gif"));
+                f136 = insFld(fCB, gFld("Форма 0409136", "", "parent_open.gif", "parent_closed.gif"));
+                    insDoc(f136, gLnk("L", "Приложения", "./default.htm", "report.gif"));
+                    insDoc(f136, gLnk("L", "Админ. консоль", "./default.htm", "report.gif"));
+    /*
+    [% ELSE %]    
+        [% IF (tree.0.who == 'root') %]
+            [% FOREACH branch=tree -%]                
+                [% SWITCH branch.who -%]
+                    [%- CASE 'folder' -%] [%- branch.report %] = insFld([% branch.preport %], gFld("[% right.name %]", "[% branch.name %]", "[% path %]?page=[% right.name %]&report=[% branch.report %]", "parent_open.gif", "parent_closed.gif"));
+                    [%- CASE 'leaf' -%]   insDoc([%- branch.preport %], gLnk("[% right.name %]", "[% branch.name %]", "[% path %]?page=[% right.name %]&report=[% branch.report %]", "report.gif"));
+                    [%- CASE 'root' -%]   [%- branch.report %] = gFld("[% right.name %]", "[% tree.0.name %]", "[% path %]?page=[% right.name %]&report=[% tree.0.report %]", "root.gif", "root.gif");
+                                          fRoot = [%- branch.report %];
+                    [%- CASE -%] 
+                    // unknown type [% branch.who -%] 
+                [% END %]            
+            [% END %]
+        [% END %]
+    /*
+    [% END %]
+    */
+// -->
+    </script>
+</head>
+
+<body bgcolor="#EEEEEE">
+<script>initializeDocument()</script>
+</body>
+</html>

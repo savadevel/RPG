@@ -1,0 +1,28 @@
+[% INSERT html_doctype.tt2 %]
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+    [% INSERT html_meta.tt2 %]
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+
+    <title>Отчётность</title>
+</head>
+
+<frameset cols='20%,*' frameborder='0'>
+
+[% IF 0 %]
+<!-- для просмотра в off line -->
+    <frame src='tree.html'    name='_left'/>
+    <frame src='default.html' name='_right'/>
+<!-- для просмотра в on line -->
+<!--
+[% ELSE %]
+    <frame src='[%left.path%]?page=[%left.name%]'   name='[%left.name%]'/>
+    <frame src='[%right.path%]?page=[%right.name%]' name='[%right.name%]'/>
+<!--
+[% END %]
+-->
+
+</frameset>
+</html>

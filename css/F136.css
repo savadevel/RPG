@@ -1,0 +1,96 @@
+/* столбец кнопка, скорректированные данные */
+td.corr
+{
+    cursor: hand;
+    border: 3px solid #000000;
+    
+}
+
+/* столбец кнопка, оригинальные данные */
+td.orig
+{
+    cursor: hand;
+    border: 1px solid #000000;
+}
+
+/* Стили управления  страницами отчетных форм */
+p.thead, p.tbody, p.tfoot
+{
+    margin: 0;
+    padding: 0 0 30 0;
+}
+
+p.thead
+{
+    font-size: 14px;
+    font-weight: bold;
+}
+
+p.tbody
+{
+    font-size: 12px;    
+}
+
+p.tfoot
+{
+    font-size: 12px;
+    text-align: left;
+}
+
+table.forma, table.bank
+{
+    border-collapse: collapse;
+    border: none;
+    mso-border-alt: solid black 1.5pt;
+    mso-padding-alt: 0cm 5.4pt 0cm 5.4pt;
+    border-bottom: solid black 0.5pt;
+    table-layout: fixed;
+}
+
+table.forma td, table.bank td
+{
+    border-top: none;
+    border-left: solid black 0.5pt;
+    order-bottom: solid black .1pt;
+    border-right: solid black 0.5pt;
+    padding: 2px 5.4pt 2px 5.4pt;
+    font-size: 10px;
+}
+
+table.forma th, table.bank th
+{
+    border: solid black 1.5pt;
+    padding: 2px 5.4pt 2px 5.4pt;
+    text-align: center;
+    font-size: 12px;
+}
+
+table.forma div.caption
+{
+    width: 640;
+    display: block;
+    float: left;
+    padding-bottom: 20;
+}
+
+/* Список формы, для задания параметров */
+table.list
+{
+    width:100%;
+    table-layout:fixed;
+    border-spacing:2;
+}        
+table.list td
+{
+    font-size:50%;
+}
+
+td.status_ok
+{
+    background-color:RGB(217, 255, 217);
+}
+
+td.status_err
+{
+    background-color:RGB(255, 230, 255);
+}

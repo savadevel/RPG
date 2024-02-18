@@ -1,0 +1,57 @@
+[% BLOCK get_size_add_fields -%]        
+    [% FOREACH field IN executor.get_param_add_fields(fields.all) -%]
+        [% SWITCH field.type -%]
+            [% CASE 'dat' -%]
+                <colgroup><col width=100 align='center' [% 'style="display:none"'  IF field.hide == 1 %]>
+            [% CASE ['str', 'txt'] -%]
+                <colgroup><col width=300 align='left'  [% 'style="display:none"'  IF field.hide == 1 %]>                
+            [% CASE 'acc' -%]
+                <colgroup><col width=160 align='center' [% 'style="display:none"' IF field.hide == 1 %]>
+            [% CASE ['int', 'flt', 'mny'] -%]
+                <colgroup><col width=100 align='right' [% 'style="display:none"'  IF field.hide == 1 %]>        
+            [% CASE ['chr'] -%]
+                <colgroup><col width=100 align='center' [% 'style="display:none"'  IF field.hide == 1 %]>        
+            [% CASE DEFAULT -%]
+                <colgroup><col width=10 align='center' [% 'style="display:none"'  IF field.hide == 1 %]>
+        [% END -%]
+    [% END -%]
+[% END -%]
+
+[% BLOCK get_desc_add_fields -%]        
+    [% FOREACH field IN executor.get_param_add_fields(fields.all) -%]
+        <th type='[% field.type %]' name='[% field.name %]' key='[% field.key %]' button='[% field.button %]' change='[% field.change %]'>
+            <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+            <th class='pic' id='sort_pic'><img src="../img/sort/asds.gif"></th>
+            <th class='desc' id='sort_desc'>[% field.desc %]</th>
+            </tr></thead></table>
+        </th>
+    [% END -%]
+[% END -%]
+
+[% BLOCK get_size_fields -%]        
+    [% FOREACH field IN executor.get_param_fields(target) -%]
+        [% SWITCH field.type -%]
+            [% CASE 'dat' -%]
+                <colgroup><col width=100 align='center' [% 'style="display:none"'  IF field.hide == 1 %]>
+            [% CASE ['str', 'txt'] -%]
+                <colgroup><col width=300 align='left'  [% 'style="display:none"'  IF field.hide == 1 %]>                
+            [% CASE 'acc' -%]
+                <colgroup><col width=160 align='center' [% 'style="display:none"' IF field.hide == 1 %]>
+            [% CASE ['int', 'flt', 'mny'] -%]
+                <colgroup><col width=100 align='right' [% 'style="display:none"'  IF field.hide == 1 %]>        
+            [% CASE DEFAULT -%]
+                <colgroup><col width=10 align='center' [% 'style="display:none"'  IF field.hide == 1 %]>
+        [% END -%]
+    [% END -%]
+[% END -%]
+
+[% BLOCK get_desc_fields -%]        
+    [% FOREACH field IN executor.get_param_fields(target) -%]
+        <th type='[% field.type %]' name='[% field.name %]' key='[% field.key %]' button='[% field.button %]' change='[% field.change %]'>
+            <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+            <th class='pic' id='sort_pic'><img src="../img/sort/asds.gif"></th>
+            <th class='desc' id='sort_desc'>[% field.desc %]</th>
+            </tr></thead></table>
+        </th>
+    [% END -%]
+[% END -%]

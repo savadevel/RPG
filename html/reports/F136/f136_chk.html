@@ -1,0 +1,201 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Форма 0409136. Резервы (ежемесячная). Контроль.</title>
+
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"> 
+    
+    <script src="../js/utils.js" type="text/javascript"></script>   
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/tabs.js" type="text/javascript"></script>       
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+    
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    
+    <script type="text/javascript">
+        FORMAT_OF_DATE = '[% dformat %]';
+        var oRequest   = new CWaitServerRespond();
+        
+        function SetChecking(chk)
+        {
+            var oFilials   = chk.form.p_sFilials;
+            var oCodes    = chk.form.p_sCodes;
+            var oLvl    = block_level;
+            
+            oLvl.style.visibility   = (!(chk.environment & 0x01) ? 'hidden' : 'visible');
+            oFilials.disabled       = !(chk.environment & 0x02);
+            oCodes.disabled         = !(chk.environment & 0x04);          
+        }
+        
+        function FormValidation(form, checker, question)
+        {
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+            if (question && !window.confirm(question))          return;
+    
+            // блокирование кнопки, пока сервер не выполнит запрос
+            oRequest.start(form, function() {form.btnExecute.disabled = false;})
+            form.btnExecute.disabled = true;
+        }        
+        
+        function init() 
+        {
+            var tabs = new CTabs('tabs', {parent:mng_tabs});
+            
+            tabs.Add('Проверка',    {select:true,  page:do_check_data});
+        }
+    
+        window.onload = init;     
+
+    </script>
+</head>
+
+[% BLOCK get_filials -%]
+    <select multiple name='p_sFilials' size=[% size %] style="width: 100%;">
+    [% FOREACH item IN dictionaries.GET_FILIALS -%]
+        <option value = [% item.id %]>&nbsp;[% item.id %]:&nbsp;[% item.name %]</option>
+    [% END -%]
+    </select>
+[% END %]
+[% BLOCK get_codes -%]
+    <select multiple name='p_sCodes' size=[% size %] style="width: 100%;">
+    [% FOREACH item IN dictionaries.GET_CODES -%]
+        <option value = [% item.code %]>&nbsp;[% item.note %]</option>
+    [% END -%]
+    </select>
+[% END %]
+[% BLOCK get_chk -%]
+    <table id='table_checkings' class='list'>
+        <colgroup><col width='15' align='center'>
+        <colgroup><col width='400' align='left'>
+        [%- FOREACH item = dictionaries.GET_CHECKINGS %]
+            <tr><td title='[% item.note %]'><input onclick='SetChecking(this);' name='page' type='radio' environment='[% item.environment %]' value='[% item.id_checking %]'></td><td>[% item.name %]</td></tr>
+        [%- END %]
+    </table>
+[% END %]
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class='body' style='margin:1 0 0 5'>
+    <table class='tabbed' cellpadding='0' cellspacing='0'>
+        <tr>
+            <td valign='top' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+            <td valign='top' width='100%'>
+                <img src='../img/0.gif' height='1' width='800px'/><br/>
+                <table cellpadding='0' cellspacing='0' style='margin:10 0 0 0'>
+                    <tr><th>Версия:</th><th style='font-weight:normal;'>[% version.label %]</th></tr>
+                    <tr><th>Отчетный период:</th><th style='font-weight:normal;'>[% date2str(version.lperiod, 'date') %] - [% date2str(version.rperiod, 'date') %]</th></tr>
+                </table>                
+            </td>
+            <td valign='top' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+        </tr>
+        <tr>
+            <td valign='bottom' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+            <td align='center' valign='bottom' width='100%'>
+                <div class='page' id="mng_tabs" style='margin:10 0 0 0;'></div>
+            </td>
+            <td valign='bottom' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+        </tr>
+    </table>    
+    
+
+    <div class='page' id="do_check_data"  style='display:none;margin: 0 0 0 0;padding:5;'>
+    <form name='frmDoChecking' onsubmit="return false;" action="" method='post' target='_blank'>
+        <input type=hidden value="CHECK" name="exe">
+		<input type=hidden value='[% version.rowver %]' name='rowver'>
+        <fieldset class='main'><legend class='main'>Параметры контроля:</legend>        
+        <table>
+            <tr>
+                <td  width="50%" valign="top">                
+                    <fieldset><legend>Филиалы:</legend>
+                        <table cellSpacing='0' cellPadding='0' width="100%">
+                        <tr>
+                            <td width='95%' valign='middle' align='left'>
+                                [% PROCESS get_filials size=8 %]
+                            </td>
+<!-- управление списком -->
+                           <td width='5%'  valign='middle' align='center'>
+                               <button title='Выбрать все филиалы'   onclick="if (this.form.p_sFilials.disabled) return; for(var i = 0; i < this.form.p_sFilials.options.length; i++) {this.form.p_sFilials.options[i].selected = true;}" style="width:22px;height:22px">+</button><br><br>
+                               <button title='Исключить все филиалы' onclick="if (this.form.p_sFilials.disabled) return; for(var i = 0; i < this.form.p_sFilials.options.length; i++) {this.form.p_sFilials.options[i].selected = false;}" style="width:22px;height:22px">-</button><br><br>
+                           </td>                            
+                        </tr>
+                        </table>                    
+                    </fieldset>        
+                </td>            
+                <td  width="50%" valign="top">                
+                    <fieldset><legend>Коды:</legend>
+                        <table cellSpacing='0' cellPadding='0' width="100%">
+                        <tr>
+                            <td width='95%' valign='middle' align='left'>
+                                [% PROCESS get_codes size=8 %]
+                            </td>
+<!-- управление списком -->
+                           <td width='5%'  valign='middle' align='center'>
+                               <button title='Выбрать все коды'   onclick="if (this.form.p_sCodes.disabled) return; for(var i = 0; i < this.form.p_sCodes.options.length; i++) {this.form.p_sCodes.options[i].selected = true;}" style="width:22px;height:22px">+</button><br><br>
+                               <button title='Исключить все коды' onclick="if (this.form.p_sCodes.disabled) return; for(var i = 0; i < this.form.p_sCodes.options.length; i++) {this.form.p_sCodes.options[i].selected = false;}" style="width:22px;height:22px">-</button><br><br>
+                           </td>                            
+                        </tr>
+                        </table>                                        
+                    </fieldset>        
+                </td>            
+            </tr>
+            <tr>
+                <td width='50%' valign='top'>
+                <fieldset><legend>Проверки:</legend>
+                    <div style='display:block;margin:0 0 0 0;height:124px;width:275px;overflow:auto'>
+                        [% PROCESS get_chk %]
+                    </div>
+                </fieldset>                                
+                </td>
+                <td width='50%' valign='top'>
+                <fieldset><legend>Информативность:</legend>
+                    <div id='block_level' style='visibility:visible;margin:0 0 0 0;height:124px;width:275px;overflow:auto'>
+                        <table id='table_checkings' class='list'>
+                        <colgroup><col width='15' align='center'>
+                        <colgroup><col width='400' align='left'>
+                        <tr><td><input name='p_iLevel' type='radio' value='1' checked></td><td>Включить в отчет ошибки</td></tr>
+                        <tr><td><input name='p_iLevel' type='radio' value='2'></td><td>Включить в отчет ошибки и пограничные случаи</td></tr>
+                        <tr><td><input name='p_iLevel' type='radio' value='3'></td><td>Включить в отчет ошибки, пограничные случаи и прошедшие проверку</td></tr>
+                        </table>
+                    </div>
+                </fieldset>                                
+                </td>
+            </tr>                        
+            <tr>
+                <td width='100%' valign='bottom' style='margin:0; padding:0' colspan='2'>
+                    <p align='left'>
+                        Экспортировать данные в:
+                        <select name='p_sOutTo' style="width: 100%;margin-top:3px" onchange="this.form.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value='html'>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value='excel'>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>            
+            </tr>
+        </table>        
+        
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>                
+    </form>
+    <script>
+        frmDoChecking.chkForm = new FormChecker();
+        
+        with(frmDoChecking)
+        {
+            with(chkForm)
+            {
+                AddRule('TheSelectItemNoMore', frmDoChecking.p_sCodes, {selected:1000}, 'Ошибка, можно задать не более 1000 счетов.');
+                AddRule('TheCheckedItemMore', frmDoChecking.page, {checked:1}, 'Ошибка, задайте тип проверки.');
+            }
+        }
+    </script>
+    </div>
+    
+</div>
+
+</div>
+</body>
+</html>

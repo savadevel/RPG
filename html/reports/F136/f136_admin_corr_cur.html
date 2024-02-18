@@ -1,0 +1,112 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=windows-1251">
+    <title>Данные, используемые для подготовки 136 формы</title>
+    
+    <link href="../css/style.css" type="text/css" rel="stylesheet">
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"> 
+   
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+    <script src="../js/utils.js" type="text/javascript"></script>
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/reports/F136/common_show_corr.js" type="text/javascript"></script>
+    <script type="text/javascript">
+    
+    function CreateMenu() 
+    {
+        mTools = new jsDOMenu(128, "", "absolute");
+        
+        with (mTools) 
+        {
+            addMenuItem(new menuItem("Сортировка", "", "code:alert('Not implement yet!');"));
+        }
+      
+        mRoot = new jsDOMenuBar("absolute");
+
+        with (mRoot) 
+        {
+            addMenuBarItem(new menuBarItem("Инструменты", mTools));
+            moveTo(-1, -1);
+        }      
+    } 
+
+    function init() 
+    {
+        InitCommon(frmUpdateCorrCln);
+        InitMenu();     
+    }
+
+    </script>
+
+</head>
+
+<!-- [% message %] -->
+
+<body alink="#000099" link="#003366" vlink="#999999" onLoad="init()">
+<div class="body">
+
+<div id="table_cur" class="page"  style="display:block">
+        <table align="center" class="sort">
+        <caption style="text-align:left">
+            <div class="caption" style="width:800px;text-align:center">
+                <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                    Курс валюты за период:
+                    <br>[% table.period_left %] - [% table.period_right %],
+                    <br>(записей: [% table.count %])
+                </p>
+            </div>
+        </caption>
+
+        <colgroup><col width="130"  align="center">
+        <colgroup><col width="90"   align="right">
+        <colgroup><col width="80"   align="center">
+        <colgroup><col width="80"   align="center">
+        <colgroup><col width="300"  align="left">        
+       
+        <thead class="sort">
+            <tr class="sort">
+                <th type="str" class="sort" id='snm'>
+                    <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                    <th class="pic"><img id='pic' src="../img/sort/asds.gif"></th>
+                    <th class="desc">Идентификатор</th>
+                    </tr></thead></table>                
+                </th>
+                <th type="mny" class="sort" id='sum'>
+                    <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                    <th class="pic"><img id='pic' src="../img/sort/asds.gif"></th>
+                    <th class="desc">Курс</th>
+                    </tr></thead></table>
+                </th>
+                <th type="dat" class="sort" id='ldate'>
+                    <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                    <th class="pic"><img id='pic' src="../img/sort/asds.gif"></th>
+                    <th class="desc">Левая граница</th>
+                    </tr></thead></table>
+                </th>                               
+                <th type="dat" class="sort" id='rdate'>
+                    <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                    <th class="pic"><img src="../img/sort/asds.gif"></th>
+                    <th class="desc">Правая граница</th>
+                    </tr></thead></table>
+                </th>                               
+                <th type="str" class="sort" id='desc'>
+                    <table class="header" cellpadding="0" cellspacing="0"><thead><tr valign="middle">
+                    <th class="pic"><img src="../img/sort/asds.gif"></th>
+                    <th class="desc">Описание</th>
+                    </tr></thead></table>
+                </th>                                               
+            </tr>
+        </thead>
+        <tbody class="sort">
+                [% executor.get_body('CORR_CUR', ['snm', 'sum', 'ldate', 'rdate', 'desc']) %]
+        </tbody>    
+        </table>
+    </form> 
+</div>
+
+</div>
+
+</div>
+</body>
+</html>

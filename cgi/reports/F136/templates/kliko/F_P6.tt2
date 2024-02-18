@@ -1,0 +1,3 @@
+<F_P6N1>[% get_data.get_body(6, 6, ['1.0.'], ['note'], ['bal_r', 'bal_v']) -%]
+<F_P6N2>[% get_data.get_body(6, 6, ['2.0.'], ['note'], ['bal_r', 'bal_v']) -%]
+<F_P6N3>[% get_data.get_body(6, 6, ['3.0.'], ['note'], ['bal_r', 'bal_v']) -%]

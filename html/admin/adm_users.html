@@ -1,0 +1,505 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Консоль регистрации пользователей</title>
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+    <script src="../js/dialog.js" type="text/javascript"></script>
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    [%- BLOCK get_users -%]
+        [%- FOREACH item = dictionaries.GET_USERS %]
+            [% item.uid -%]:{login:'[% item.login.replace('\'', '"') %]', domain:'[% item.domain.replace('\'', '"') %]', position:'[% item.position.replace('\'', '"') %]', name:'[% item.name.replace('\'', '"') %]', fname:'[% item.fname.replace('\'', '"') %]', mname:'[% item.mname.replace('\'', '"') %]', lname:'[% item.lname.replace('\'', '"') %]', ip:[[% PROCESS get_ip uid=item.uid %]], department:'[% item.department.replace('\'', '"') %]', phone:'[% item.phone.replace('\'', '"') %]', fax:'[% item.fax.replace('\'', '"') %]', note:'[% item.note.replace('\'', '"') %]'} [%- ',' IF loop.next != undef %]
+        [%- END -%]        
+    [%- END -%]
+
+    [%- BLOCK get_ip -%]
+        [%- temp = [] -%]
+        [%- FOREACH ip = dictionaries.GET_IP -%]
+            [%- NEXT IF uid != ip.uid -%]
+            [%- temp.push(ip.number) -%]
+        [%- END -%]
+        [%- "'" _ temp.join("','") _ "'" IF temp.size > 0  -%]
+    [%- END -%]
+    
+    <script type="text/javascript">       
+        
+        FORMAT_OF_DATE = '[% dformat %]';
+        
+        var hLastUser
+        var objCurrUser;
+        var dlgNewUser;
+        var hUsers =
+        {
+        // [% PROCESS get_users %]
+        };
+
+        function SetUser(obj, uid) 
+        {
+            var aObj =
+            [
+                {obj:lblLogin,        type:'label',      from:'login'},
+                {obj:lblDomain,       type:'label',      from:'domain'},
+                {obj:frmUser.edtName,         type:'editbox',    from:'name'},
+                {obj:frmUser.edtFname,        type:'editbox',    from:'fname'},
+                {obj:frmUser.edtMname,        type:'editbox',    from:'mname'},
+                {obj:frmUser.edtLname,        type:'editbox',    from:'lname'},
+                {obj:frmUser.edtDepartment,   type:'editbox',    from:'department'},
+                {obj:frmUser.edtPhone,        type:'editbox',    from:'phone'},
+                {obj:frmUser.edtFax,          type:'editbox',    from:'fax'},
+                {obj:frmUser.edtPosition,     type:'editbox',    from:'position'},
+                {obj:frmUser.edtNote,         type:'editbox',    from:'note'},
+                {obj:table_ip,                type:'table',      from:'ip'}
+            ];            
+          
+            for (var i = 0; i < aObj.length; i++)
+            {                   
+                switch(aObj[i].type)
+                {
+                    case 'editbox':
+                        aObj[i].obj.value      = hUsers[uid][aObj[i].from];
+                        break;
+
+                    case 'label':
+                        aObj[i].obj.innerText  = hUsers[uid][aObj[i].from];
+                        break;
+                        
+                    case 'checkbox':
+                        aObj[i].obj.checked    = hUsers[uid][aObj[i].from];                        
+                        break;
+                        
+                    case 'table':
+                        // удаляем элементы списка                      
+                        while(aObj[i].obj.tBodies[0].rows.length > 0)
+                        {
+                            aObj[i].obj.tBodies[0].removeChild(aObj[i].obj.tBodies[0].lastChild);                            
+                        }
+                        
+                        // сбрасываем текущий IP
+                        table_ip.currrow = null;
+                                            
+                        // добавляем IP в список
+                        for(var j=0; j < hUsers[uid][aObj[i].from].length; j++)
+                        {
+                            AddIP(hUsers[uid][aObj[i].from][j].split('.'));                         
+                        }
+                        break;
+                        
+                    case 'btn_delete':
+//                        aObj[i].obj.disabled = hUsers[uid][aObj[i].from];
+                        break;
+                        
+                    default:
+                        break;
+                }
+            }
+            
+            try
+            {
+                obj.checked  = true;
+            }
+            catch(e)
+            {
+            }
+        
+            frmUser.uid = uid;
+        }
+
+        function FormValidation(from, checker)
+        {
+            var form = from.form;
+
+            if (form.sent) return;
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+
+            var sMsg   = '';
+            var uid  = frmUser.uid;
+            
+
+            if (!uid) 
+            {
+                alert('Ошибка, нужно выбрать пользователя');
+                return;
+            }
+
+            if (from.name == 'btnDelete')
+            {
+                sMsg += "Внимание, будет удален пользователь '" + hUsers[uid].domain + '\\' + hUsers[uid].login  + "', продолжить?";
+            }
+            else
+            {            
+                sMsg += "Внимание, будут изменены параметры пользователя '" + hUsers[uid].domain + '\\' + hUsers[uid].login + "'";
+                sMsg += '\nВы уверены, что хотите продолжить?';
+            }                        
+            
+            if(window.confirm(sMsg))
+            {
+                var hSendIp = {};
+                
+                // создаем список IP пользователя, считаем что все IP на 
+                // странице новые
+                for (var i = 0; i < table_ip.tBodies[0].rows.length; i++)
+                {
+                    hSendIp[table_ip.tBodies[0].rows[i].innerText] = 'lstIpIns';
+                }
+                
+                // учитываем исходный список IP
+                for (var i = 0; i < hUsers[uid]['ip'].length; i++)
+                {
+                    if (hSendIp[hUsers[uid]['ip'][i]])
+                        delete hSendIp[hUsers[uid]['ip'][i]]; // пользователю уже приписан этот IP
+                    else
+                        hSendIp[hUsers[uid]['ip'][i]] = 'lstIpDel';                    
+                }
+
+                for (var ip in hSendIp)
+                {
+                    var obj   = document.createElement('<input name="' + (hSendIp[ip]) + '" type="hidden">');
+                    obj.value = ip;
+                    form.appendChild(obj);
+                }
+
+                form.submit();
+                form.btnEdit.disabled   = true;
+                form.btnCreate.disabled = true;
+                form.btnDelete.disabled = true;
+
+                form.sent = true;
+            }
+        }
+        
+        function AddIP(ip)
+        {
+            var row, tBody = table_ip.tBodies[0];
+            var strID = String(ip[0]).formatInt(3) + '.' + String(ip[1]).formatInt(3) + '.' + String(ip[2]).formatInt(3) + '.' + String(ip[3]).formatInt(3);
+
+            // цикл по IP            
+            for (var i = 0; i < tBody.rows.length; i++)
+            {
+                if (tBody.rows[i].innerText == strID)
+                {
+                    // дубли запрещены
+                    return false;
+                }
+            }
+
+            row = tBody.insertRow();            
+            row.insertCell();    
+            row.firstChild.innerText   = strID;
+            row.style.cursor           = 'hand';
+            row.style.background       = 'none';
+            row.style.color            = '#000000';
+            row.firstChild.style.color = '#000000';
+
+            // событие по которому выделяем строку
+            row.onclick = function()
+                {
+                    if (table_ip.currrow)
+                    {
+                        table_ip.currrow.style.background       = 'none';
+                        table_ip.currrow.style.color            = '#000000';                        
+                        table_ip.currrow.firstChild.style.color = '#000000';
+                        
+                        if (table_ip.currrow == row)
+                        {
+                            table_ip.currrow = null;
+                            return;
+                        }
+                    }
+
+                    row.style.backgroundColor  = '#000066';                             
+                    row.firstChild.style.color = '#FFFFFF';
+                    row.style.color            = '#FFFFFF';
+                    table_ip.currrow           = row;
+                }
+            row.onclick();
+
+            return true;
+        }
+
+        function DelIP()
+        {
+            if (!table_ip.currrow)
+            {
+                alert("Ошибка, выберите IP для удаления");
+                return false;
+            }
+            if (!window.confirm("Будет удален IP: '" + table_ip.currrow.innerText + "', продолжить?"))
+                return true;
+
+            table_ip.tBodies[0].removeChild(table_ip.currrow);
+            table_ip.currrow = null;
+
+            return true;
+        }
+        
+        function init() 
+        {
+            if (objCurrUser)
+                SetUser(frmUser.lstUsers[objCurrUser.index], objCurrUser.uid);
+        
+            dlgNewUser = new MyDialog('frmCreateUser', {desc:'Новый пользователь', height:145, width:335, owner:frmUser.parentNode}); 
+
+            dlgNewUser.AddObject('hidden',  {id:'page', val:'USERS'});
+            dlgNewUser.AddObject('hidden',  {id:'exe', val:'CREATE'});
+
+            dlgNewUser.AddObject('label', {val:'Логин:', width:50, top:15});
+            dlgNewUser.AddObject('edit',  {id:'edtLogin',  val:'', align:'left', width:100, top:15, left:55});
+
+            dlgNewUser.AddObject('label', {val:'Домен:', width:50, top:15, left:170});
+            dlgNewUser.AddObject('edit',  {id:'edtDomain',  val:'', align:'left', width:100, top:15, left:225});
+
+            dlgNewUser.AddObject('label', {val:'ФИО:', width:50, top:50, left:5});
+            dlgNewUser.AddObject('edit',  {id:'edtName',  val:'', align:'left', width:270, top:50, left:55});
+
+            dlgNewUser.AddObject('button',  {id:'btn', val:'Добавить', width:80, top:85, left:245, 
+                                            exe:function()
+                                            {
+                                                var chkCreate = new FormChecker();
+                                                var form      = document.forms['frmCreateUser'];
+                                                
+                                                
+                                                chkCreate.AddRule('TheValueIs', form.edtLogin,  {ext:function(){return (/^([A-Za-z0-9]|-|_)+$/.test(arguments[0]))}}, 'Ошибка, не верно заданы параметры пользователя (логин)');
+                                                chkCreate.AddRule('TheValueIs', form.edtDomain, {ext:function(){return (/^([A-Za-z0-9]|-|_)+$/.test(arguments[0]))}}, 'Ошибка, не верно заданы параметры пользователя (домен)');
+                                                chkCreate.AddRule('TheValueIs', form.edtName,   {ext:function(){return (/^(\w|\.|-|[А-Я]|[а-я]| )+$/.test(arguments[0]))}}, 'Ошибка, не верно заданы параметры пользователя (ФИО)');
+                                                                                       
+                                                if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+                                                
+                                                // комбинация Domain-Login, должна быть уникальной
+                                                for(var uid in hUsers)
+                                                {
+                                                    if (!(hUsers[uid].login == form.edtLogin.value && hUsers[uid].domain == form.edtDomain.value)) 
+                                                        continue;
+                                                    alert('Ошибка, такой пользователь уже зарегистрирован');
+                                                    return;                                                    
+                                                }
+                                                
+                                                if (!window.confirm("Будет создан пользователь '" + form.edtDomain.value + '\\' + form.edtLogin.value + "', продолжить?")) return;
+
+                                                form.submit();  
+                                                
+                                                dlgNewUser.Hide();
+
+                                                frmUser.btnEdit.disabled   = true;
+                                                frmUser.btnCreate.disabled = true;
+                                                frmUser.btnDelete.disabled = true;
+                                            }});
+
+            dlgNewIP = new MyDialog('frmAddIP', {desc:'Новый IP', height:100, width:165, owner:frmUser.parentNode});             
+            dlgNewIP.AddObject('edit',  {id:'edtFirst',  val:'', align:'center', width:30, top:15});
+            dlgNewIP.AddObject('label', {val:'.', width:10, top:22, align:'center',left:35});
+
+            dlgNewIP.AddObject('edit',  {id:'edtSecond',  val:'', align:'center', width:30, top:15, left:45});
+            dlgNewIP.AddObject('label', {val:'.', width:10, top:22, left:75, align:'center'});
+
+            dlgNewIP.AddObject('edit',  {id:'edtMiddle',  val:'', align:'center', width:30, top:15, left:85});
+            dlgNewIP.AddObject('label', {val:'.', width:10, top:22, align:'center', left:115});
+
+            dlgNewIP.AddObject('edit',  {id:'edtLast',  val:'', align:'center', width:30, top:15, left:125});
+
+            dlgNewIP.AddObject('button',  {id:'btn', val:'Добавить', width:80, top:45, left:75, 
+                                            exe:function()
+                                            {
+                                                var chkCreate = new FormChecker();
+                                                var form      = document.forms['frmAddIP'];
+                                                
+                                                
+                                                chkCreate.AddRule('TheValueIs', form.edtFirst,  {ext:function(){return (/^\d{1,3}$/.test(arguments[0]) && arguments[0] >= 0 && arguments[0] <= 255)}}, 'Ошибка, неверно задан IP');
+                                                chkCreate.AddRule('TheValueIs', form.edtSecond, {ext:function(){return (/^\d{1,3}$/.test(arguments[0]) && arguments[0] >= 0 && arguments[0] <= 255)}}, 'Ошибка, неверно задан IP');
+                                                chkCreate.AddRule('TheValueIs', form.edtMiddle, {ext:function(){return (/^\d{1,3}$/.test(arguments[0]) && arguments[0] >= 0 && arguments[0] <= 255)}}, 'Ошибка, неверно задан IP');
+                                                chkCreate.AddRule('TheValueIs', form.edtLast,   {ext:function(){return (/^\d{1,3}$/.test(arguments[0]) && arguments[0] >= 0 && arguments[0] <= 255)}}, 'Ошибка, неверно задан IP');
+                                                                                       
+                                                if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+                                                if (false == AddIP([form.edtFirst.value, form.edtSecond.value, form.edtMiddle.value, form.edtLast.value]))
+                                                { 
+                                                    alert('Ошибка, такой IP уже задан')
+                                                    return;
+                                                }
+
+                                                dlgNewIP.Hide();                                                
+                                            }});
+
+        }
+
+        window.onload = init; 
+
+    </script>
+
+    <style type="text/css">
+        table.nice
+        {
+            width:100%;
+            table-layout:fixed;
+            border-spacing:2;
+        }
+
+        table.nice td
+        {
+            font-size:75%;
+        }    
+
+        table.nice th
+        {
+            color:white;
+            background-color:#000066;
+            font-weight:normal;
+            text-align:center;
+        }
+
+        table.user
+        {
+            width:100%;
+            table-layout:fixed;
+        }
+
+        table.user td
+        {
+            text-align:left;
+        }
+
+        .param
+        {               
+        }
+
+        .value
+        {
+            font-size:75%;
+            background-color: #ffffff;
+            border: 1 solid silver;            
+            padding: 1 5 1 5;
+            text-align:left;
+            width:100%;
+            height:20;
+            overflow-y:hidden;
+        }
+    </style>
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class="body">
+
+<!-- просмотр-редактирование списка пользователей -->
+<div class="page">
+<!-- основной кусок -->
+    
+    <form name=frmUser onsubmit="return false;" action="" method=post target=''>        
+        <input type=hidden value="USERS"  name="page">
+        <input type=hidden value=""       name="exe">
+                
+        <fieldset class='main' style='margin-top:0;text-align:left;width:100%;height:430px'>
+            <legend class='main'>Управление пользователями:</legend>       
+
+<!-- список пользователей -->
+            <fieldset style='position:absolute;position:relevant;width:35%;height:380px;'>
+                <legend>Пользователи:</legend>
+                <div style='display:block;margin:5px 0 5px 0;height:335px;border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto'>
+                    <table class='slim'>
+                        [%- FOREACH item = dictionaries.GET_USERS %]
+                            <tr valign='top' onclick='SetUser(frmUser.lstUsers[this.rowIndex], [% item.uid %])'>
+                                <td width='15%'><input name='lstUsers' id=[% item.uid %] value='[% item.uid %]' type='radio'/></td>
+                                <td width='40%'>[% item.domain %]\[% item.login %]</td>
+                                <td width='45%'>[% item.name %]</td>
+                            </tr>
+                            [%- IF item.domain == show_user.domain && item.login == show_user.login -%]
+                            <script type="text/javascript">
+                                objCurrUser = {index:[% loop.index() %], uid:[% item.uid %]};                                
+                            </script>
+                            [%- END -%]
+                        [% END -%]                        
+                    </table>
+                </div>                                
+            </fieldset>
+            
+<!-- параметры пользователя -->
+            <fieldset style='position:absolute;width:65%;height:380px'>
+                <legend>Параметры пользователя:</legend>            
+                    <table class='user'>
+                        <tr>
+                            <td width='20%'>Логин:</td>
+                            <td width='30%' colspan=2>
+                                <span id='lblLogin' class='value'></span>
+                            </td>
+                            <td width='20%'>Домен:</td>
+                            <td width='30%' colspan=2>
+                                <span id='lblDomain' class='value'></span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan=2>ФИО:</td>
+                            <td colspan=4><input name='edtName' type='text' style='width:100%'/></td>
+                        </tr>
+                        <tr>
+                            <td colspan=2>
+                                Фамилия:<br>
+                                <input type='text' name='edtFname' style='width:100%'/>
+                            </td>
+                            <td colspan=2>
+                                Имя:<br>
+                                <input type='text' name='edtMname' style='width:100%'/>
+                            </td>
+                            <td colspan=2>
+                                Отчество:<br>
+                                <input type='text' name='edtLname' style='width:100%'/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan=5 rowspan=2>
+                                IP машин с которых разрешен доступ:<br>
+                                <div title="Список машин, с которых разрешен доступ выбранному пользователю. Задайте 000.000.000.000 для запрет со всех машин или 255.255.255.255 для разрешения со всех машин." style='border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto;height:60px;padding:3 5 3 5;margin:5 0 10 0'>
+                                    <table class='nice' id='table_ip' width='100%'>
+                                    </table>
+                                </div>
+                            </td>
+                            <td valign='bottom'><button style='width:20px;height:20px' onclick='dlgNewIP.Show({});' title='Добавить новый IP'>&lt;</button></td>
+                        </tr>
+                        <tr>
+                            <td valign='top'><button style='width:20px;height:20px' title='Удалить выбранный IP' onclick='DelIP();'>&gt;</button></td>
+                        </tr>
+                        <tr>
+                            <td colspan=2>Отдел:</td>
+                            <td colspan=4><input type='text' name='edtDepartment' style='width:100%'/></td>
+                        </tr>
+                        <tr>
+                            <td colspan=2>Должность:</td>
+                            <td colspan=4><input type='text' name='edtPosition' style='width:100%'/></td>
+                        </tr>
+                        <tr>
+                            <td>Телефон:</td>
+                            <td colspan=2><input type='text' name='edtPhone'  style='width:100%'/></td>
+                            <td>Факс:</td>
+                            <td colspan=2><input type='text' name='edtFax' style='width:100%'/></td>
+                        </tr>
+                        <tr>
+                            <td colspan=6>
+                                Описание:<br>
+                                <textarea name='edtNote' style='width:100%'></textarea>
+                            </td>
+                        </tr>
+                    </table>
+            </fieldset>            
+        </fieldset>
+        
+        <p style="margin-top:5; text-align:right">
+            <input style="width:128px" name="btnEdit"  type="submit" value="Применить" title="Сохранить парметры текущего пользователя" onClick="frmUser.exe.value='EDIT'; FormValidation(this, frmUser.chkEdit);">
+            <input style="width:128px;margin-left:10px" name="btnDelete" type="submit" title="Удалить текущего пользователя из задачи" value="Удалить" onClick="frmUser.exe.value='DELETE'; FormValidation(this, frmUser.chkDelete);">
+            <input style="width:128px;margin-left:10px" name="btnCreate" type="submit" title="Добавить нового пользователя в задачу" value="Добавить" onClick="frmUser.exe.value='CREATE'; dlgNewUser.Show({});">
+        </p>        
+    </form>        
+    
+    <script>
+        frmUser.chkEdit   = new FormChecker();  
+        frmUser.chkDelete = new FormChecker();
+        
+        frmUser.chkEdit.AddRule('TheValueIs', frmUser.edtName,   {ext:function(){return (/^(\w|\.|-|[А-Я]|[а-я]| )+$/.test(arguments[0]))}}, 'Ошибка, не верно заданы параметры пользователя (ФИО)');
+    </script>    
+</div>    
+
+</div>
+</body></html>

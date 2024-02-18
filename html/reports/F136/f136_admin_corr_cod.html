@@ -1,0 +1,216 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Данные, используемые для подготовки 136 формы</title>
+
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"/> 
+
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    
+    [% BLOCK GET_CODES %]
+        [%- tmp = {} -%]
+        [%- FOREACH item IN dictionary.GET_CODE -%]
+            [%- NEXT IF ! bin_oper(item.cando, '&', 2) -%]
+            [%- acc = item.acc -%]
+            [%- IF !(tmp.exists(acc)) -%]            
+                [%- tmp.$acc = [] -%]
+            [%- END -%]        
+            [%- tmp.$acc.push(item.code) -%]         
+        [%- END -%]    
+        [% FOREACH key = tmp.sort %]
+            '[% key %]':['[% tmp.$key.join("','") %]'] [%- ',' IF loop.next != undef %] 
+        [%- END -%]
+    [%- END -%]
+   
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/MultiSortTable.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/dialog.js" type="text/javascript"></script>
+    <script src="../js/reports/F136/common_show_corr.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+
+    <script type="text/javascript">
+    
+    FORMAT_OF_DATE = '[% dformat %]';
+    
+    var LV_DIALOG, LV_CORR_TABLE, LV_MULTI_SORT, LV_SORT, LV_TANSFER;
+    var LV_ACCESS    = ("[% (version.access == 2) ? 'true' : 'false' %]" == "true");
+    var LV_OBJ_ROOT  = window.addEventListener || window.attachEvent ? window : document.addEventListener ? document : null;
+    var LV_MSG_CLOSE = "Вы не сохранили изменения. Действительно хотите уйти отсюда?";
+    var LV_ARR_CODES = 
+    {
+//  [% PROCESS GET_CODES %]
+    };
+
+    function CreateMenu() 
+    {
+        mTools = new jsDOMenu(180, "absolute");
+        
+        with (mTools) 
+        {
+            addMenuItem(new menuItem("применить", "",  "code:LV_CORR_TABLE.Submit(frmUpdateCorr);", LV_ACCESS));
+            addMenuItem(new menuItem("перенести коррекции", "",  "code:LV_TANSFER.Apply();", LV_ACCESS));
+            addMenuItem(new menuItem("сортировка", "", "code:if (!LV_DIALOG.IsShow()) {LV_MULTI_SORT.Show();} else {alert('Закройте диалог редактирования параметров и повторите попытку.');}"));
+        }
+      
+        mRoot = new jsDOMenuBar("absolute", "", false);
+
+        with (mRoot) 
+        {
+            addMenuBarItem(new menuBarItem("Инструменты", mTools));
+            moveTo(-1, -1);
+        }      
+    }
+    
+    function ShowDialog(from)
+    {
+        if (LV_MULTI_SORT.IsShow())
+        {
+            alert('Закройте диалог параметров сортировки и повторите попытку.');
+            return;
+        }        
+    
+        var top = 0, left = 0;
+        
+        if (LV_DIALOG.IsShow())
+        {
+            LV_DIALOG.Hide();
+            // сохраняем позицию размещения
+            top  = LV_DIALOG.GetTop();
+            left = LV_DIALOG.GetLeft();
+        }
+
+        var btnSkip   = LV_DIALOG.GetObject('btnSkip');
+        var btnDelete = LV_DIALOG.GetObject('btnDelete');
+        var btnApply  = LV_DIALOG.GetObject('btnApply');
+
+        btnSkip.disabled   = !LV_ACCESS || !(LV_CORR_TABLE.canUnEdit(from));
+        btnDelete.disabled = !LV_ACCESS || !(LV_CORR_TABLE.canDelete(from)) || 0 == from.src;
+        btnApply.disabled  = !LV_ACCESS;        
+        
+        LV_DIALOG.Show({}, top, left, from);
+    }    
+    
+    function init() 
+    {
+        var table   = show_corr;
+        
+        LV_SORT       = new CSortingOfTable(show_corr, {});        
+        LV_MULTI_SORT = new CMultiSortingOfTable(show_corr, 'frmMultiSort', {form:frmRequest});
+        LV_CORR_TABLE = new CTableCorrEx(table, {sub_key:{exclude:'sum_code', link:'sum_acc', val:LV_ARR_CODES}});
+        LV_DIALOG     = new MyDialog('frmCurrRow', {desc:'Редактирование остатка на счете', width:350, height:180});
+        LV_TANSFER    = new CTransferCorrections(LV_CORR_TABLE, {keys:['sum_aid', 'sum_acc', 'sum_code'], correction:{field:'sum_src', value:'1'}});
+
+        LV_CORR_TABLE.AddListener('ON_BEFORE_SUBMIT', function () {LV_OBJ_ROOT.onbeforeunload = null;});
+        LV_SORT.AddListener('ON_AFTER_SORTING',  function () {LV_CORR_TABLE.ReDraw()});
+        
+        LV_OBJ_ROOT.onbeforeunload = function() {if (LV_CORR_TABLE.IsChange()) return LV_MSG_CLOSE;};        
+                
+        InitMenu();
+
+        LV_DIALOG.AddListener('ON_DLG_SHOW', function () {LV_CORR_TABLE.OnShow(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4])});
+        LV_DIALOG.AddListener('ON_DLG_HIDE', function () {LV_CORR_TABLE.OnHide(arguments[0], arguments[1], arguments[2])});
+
+        LV_DIALOG.AddObject('label', {val:'счет:', width:210, top:5, left:5});
+        LV_DIALOG.AddObject('edit',  {id:'acc_nmb', top:25, width:210, readonly:true, align:'center'});    
+
+        LV_DIALOG.AddObject('label', {val:'дата проводки:', width:120, top:5, left:220});
+        LV_DIALOG.AddObject('edit',  {id:'sum_bdt', top:25, width:120, readonly:true, align:'center'}); 
+
+        LV_DIALOG.AddObject('label', {val:'остаток на счете:', width:165, top:55, left:5});
+        LV_DIALOG.AddObject('edit',  {id:'sum_slc', width:165, top:75, align:'right'});    
+
+        LV_DIALOG.AddObject('label', {val:'назначенный код:', width:165, top:55, left:175});
+        LV_DIALOG.AddObject('list',  {id:'sum_code', width:165, top:75, size:1});    
+
+        LV_DIALOG.AddObject('button', {id:'btnApply',  val:'Применить', height: 25, width:80, top:115, left:80,  
+                                       exe:function()
+        {
+                                            var chkCreate = new FormChecker();
+                                            var form      = document.forms['frmCurrRow'];
+                
+                                            chkCreate.AddRule('TheValueIs', form.sum_slc, {ext:function(){return (arguments[0].match(/^\d+/) != null) && (arguments[0] * 1 >= 0) && (arguments[0] * 1 <= 100000000000)}}, 'Ошибка, не правильно задан остаток, остаток должен быть в диапазоне от 0 до 100000000000');
+                                                                                   
+                                            if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+
+                                            LV_DIALOG.Hide('btnApply');
+        }
+                                       , readonly:[% (version.access == 2) ? 'false' : 'true' %]
+                                       });
+        LV_DIALOG.AddObject('button', {id:'btnDelete', val:'Удалить',   height: 25, width:80, top:115, left:170, exe:function(){LV_DIALOG.Hide('btnDelete')}, readonly:[% (version.access == 2) ? 'false' : 'true' %]});
+        LV_DIALOG.AddObject('button', {id:'btnSkip',   val:'Сбросить',  height: 25, width:80, top:115, left:260, exe:function(){LV_DIALOG.Hide('btnSkip')}, readonly:[% (version.access == 2) ? 'false' : 'true' %]  });                        
+                
+    }
+
+    window.onload = init;     
+
+    </script>
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999">
+
+<div class="body">
+
+<div class="page"  style="display:block" align="right">
+    <table align="right">
+        <tr>
+            <td style="background-color:#6699FF; width:50px"></td>
+            <td id="cls">значение изменено</td>
+            <td style="background-color:#FF3300; width:50px"><p></p></td>
+            <td id="cls">удаление значения</td>
+        </tr>
+        <tr>
+            <td style="background-color:#ffffcc; width:50px"><p></p></td>
+            <td id="cls">выбранная строка</td>
+            <td style="background-color:#66FF00; width:50px"><p></p></td>
+            <td id="cls">новое значение</td>
+        </tr>
+    </table>
+</div>
+
+<div id="table_corr_cod" class="page"  style="display:block">
+    <form id=frmRequest onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request %]
+    </form>
+    
+    <form id=frmUpdateCorr onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request replace = {exe => ['IMPORT'], lstRowver => [version.rowver]} %]
+    </form>         
+    
+    <table align="center" class="sort_table" id="show_corr">
+    <caption style="text-align:left">
+        <div class="caption" style="width:800px;text-align:center">
+            <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                [% table.description %]
+                [% IF table.period_left != undef && table.period_right != undef %]
+                    <br> за период [% table.period_left %] - [% table.period_right %]
+                [% END %]
+                <br>(записей: [% table.count %])
+            </p>
+        </div>
+    </caption>
+
+    [% PROCESS get_size_fields target='GET_DATA' %]
+
+    <thead id="show_head">
+        <tr>
+            [% PROCESS get_desc_fields target='GET_DATA' %]
+        </tr>
+    </thead>
+    <tbody id="show_body">
+            [% executor.get_body('GET_DATA') %]
+    </tbody>    
+    </table>    
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,38 @@
+[% USE put_date      = format('%04d%02d%02d')   -%]
+[% USE put_date_list = format('%02d.%02d.%04d') -%]
+[% BLOCK get_list_days -%]
+[% FOREACH date IN report.dates -%]
+;[% put_date_list(date.day, date.month, date.year) -%]
+[% END -%]	
+[% END -%]
+ORS;0005;[% bank.registr_num %];[% put_date(report.date_first.year, report.date_first.month, report.date_first.day) -%];[% put_date(report.date_curr.year, report.date_curr.month, report.date_curr.day) -%];[% report.number %];[% report.days %];[% put_date(report.date_report.year, report.date_report.month, report.date_report.day) -%];[% report.k_mean_rub %]
+{SECTION-D
+1.[% PROCESS get_list_days %]
+SECTION-D}
+{SECTION1
+[% get_data.get_body(1, 1, [], ['num', 'empty'], ['bal_r']) -%]
+SECTION1}
+{SECTION2
+[% get_data.get_body(2, 2, [], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+SECTION2}
+{SECTION3
+[% get_data.get_body(3, 3, [], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+SECTION3}
+{SECTION5
+[% get_data.get_body(5, 5, [], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+SECTION5}
+{SECTION6
+[% get_data.get_body(6, 6, [], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+SECTION6}
+{SECTION7
+1.
+[% get_data.get_body(7, 7, ['1.0.'], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+2.
+[% get_data.get_body(7, 7, ['2.0.'], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+3.
+[% get_data.get_body(7, 7, ['3.0.'], ['num', 'note'], ['bal_r', 'bal_v']) -%]
+SECTION7}
+{SECTION-R
+SECTION-R}
+{SECTION-R7
+SECTION-R7}

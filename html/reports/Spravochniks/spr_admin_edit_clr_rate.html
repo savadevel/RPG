@@ -1,0 +1,270 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]            
+    <title>Консоль корректировки курсов клиринговых операций</title>
+    
+    <link href="../css/spravochniks.css"  type="text/css" rel="stylesheet"/> 
+   
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/MultiSortTable.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/dialog.js" type="text/javascript"></script>
+    <script src="../js/reports/Spravochniks/common_show_data.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    [% BLOCK get_clr_codes %]
+        [% FOREACH item IN dictionary.GET_CLR_CODES %] 
+            [%- NEXT IF item.als.defined -%]
+            {id:'[% item.code %]', name:'[% item.code %]'} [% ',' IF loop.next %]
+        [%- END -%]                        
+    [%- END -%]
+
+    <script type="text/javascript">
+
+    FORMAT_OF_DATE = '[% dformat %]';
+
+    var LV_ACCESS    = ("[% (version.access == 2) ? 'true' : 'false' %]" == "true");
+    var LV_DIALOG, LV_DIALOG_ADD, LV_TABLE, LV_MULTI_SORT, LV_SORT;
+    var LV_OBJ_ROOT  = window.addEventListener || window.attachEvent ? window : document.addEventListener ? document : null;
+    var LV_MSG_CLOSE = "Вы не сохранили изменения. Действительно хотите уйти отсюда?";
+    
+    var LC_ARR_CLR_CODES =
+    [
+        // [% PROCESS get_clr_codes %]
+    ];
+    
+    function CreateMenu() 
+    {
+        mTools = new jsDOMenu(128, "absolute");
+        
+        with (mTools) 
+        {
+            addMenuItem(new menuItem("новые курс", "", "code:ShowDialogAdd();"));
+            addMenuItem(new menuItem("сортировка", "", "code:if (!LV_DIALOG.IsShow() && !LV_DIALOG_ADD.IsShow()) {LV_MULTI_SORT.Show();} else {alert('Закройте диалог(и) редактирования и повторите попытку.');}"));
+            addMenuItem(new menuItem("применить",  "", "code:LV_TABLE.Submit(frmUpdateData);"));
+        }
+      
+        mRoot = new jsDOMenuBar("absolute", "", false);
+
+        with (mRoot) 
+        {
+            addMenuBarItem(new menuBarItem("Инструменты", mTools));
+            moveTo(-1, -1);
+        }      
+    } 
+
+    function ShowDialog(from)
+    {
+        if (LV_MULTI_SORT.IsShow() || LV_DIALOG_ADD.IsShow())
+        {
+            alert('Закройте диалог(и) и повторите попытку.');
+            return;
+        }        
+    
+        var top = 0, left = 0;
+        
+        if (LV_DIALOG.IsShow())
+        {
+            LV_DIALOG.Hide();
+            // сохраняем позицию размещения
+            top  = LV_DIALOG.GetTop();
+            left = LV_DIALOG.GetLeft();
+        }
+
+        var btnSkip  = LV_DIALOG.GetObject('btnSkip');
+        var btnDelete = LV_DIALOG.GetObject('btnDelete');
+        var btnApply = LV_DIALOG.GetObject('btnApply');
+
+        btnSkip.disabled   = !LV_ACCESS || !(LV_TABLE.canUnEdit(from));
+        btnDelete.disabled = !LV_ACCESS || !(LV_TABLE.canDelete(from));
+        btnApply.disabled  = !LV_ACCESS;
+        
+        LV_DIALOG.Show({}, top, left, from);
+    }    
+
+    function ShowDialogAdd()
+    {
+        if (LV_MULTI_SORT.IsShow() || LV_DIALOG.IsShow())
+        {
+            alert('Закройте диалог(и) и повторите попытку.');
+            return;
+        }        
+    
+        var top = 0, left = 0;
+        
+        if (LV_DIALOG_ADD.IsShow())
+        {
+            LV_DIALOG_ADD.Hide();
+            // сохраняем позицию размещения
+            top  = LV_DIALOG_ADD.GetTop();
+            left = LV_DIALOG_ADD.GetLeft();
+        }
+
+        var btnAdd = LV_DIALOG_ADD.GetObject('btnAdd');
+
+        btnAdd.disabled  = (!LV_ACCESS);
+        
+        LV_DIALOG_ADD.Show({}, top, left);
+    }    
+
+    function init()
+    {
+        var table   = show_corr;
+        LV_SORT       = new CSortingOfTable(show_corr, {});        
+        LV_MULTI_SORT = new CMultiSortingOfTable(table, 'frmMultiSort', {form:frmRequest});
+        LV_TABLE      = new CTableEdit(table, {});
+        LV_DIALOG     = new MyDialog('frmCurrRow', {desc:'Редактирование курса клиринга', width:300, height:165});
+        LV_DIALOG_ADD = new MyDialog('frmNewRow',  {desc:'Новый курс', width:300, height:165});
+
+        LV_TABLE.AddListener('ON_BEFORE_SUBMIT', function () {LV_OBJ_ROOT.onbeforeunload = null;});        
+        LV_SORT.AddListener('ON_AFTER_SORTING',  function () {LV_TABLE.ReDraw()});
+        
+        LV_OBJ_ROOT.onbeforeunload = function() {if (LV_TABLE.IsChange()) return LV_MSG_CLOSE;};        
+        
+        InitMenu();        
+
+        LV_DIALOG.AddListener('ON_DLG_SHOW',       function () {LV_DIALOG.error = true; LV_TABLE.OnShow(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4])});
+        LV_DIALOG.AddListener('ON_DLG_HIDE',       function () {LV_DIALOG.error = LV_TABLE.OnHide(arguments[0], arguments[1], arguments[2]);});
+        LV_DIALOG.AddListener('ON_DLG_AFTER_HIDE', function () {if (!LV_DIALOG.error) ShowDialog(arguments[0].row);});
+
+        LV_DIALOG.AddObject('hidden', {id:'rowver'});
+
+        LV_DIALOG.AddObject('label',  {val:'код клиринга:', width:140, top:5, left:5});
+        LV_DIALOG.AddObject('edit',   {id:'code',  top:25, width:140, readonly:true, align:'center'});    
+                                      
+        LV_DIALOG.AddObject('label',  {val:'база курса:', width:140, top:5, left:150});
+        LV_DIALOG.AddObject('edit',   {id:'base', top:25, width:140, align:'right'});    
+                                      
+        LV_DIALOG.AddObject('label',  {val:'дата курса:', width:140, top:55, left:5});
+        LV_DIALOG.AddObject('date',   {id:'date', left:5,  top:75, width:140, readonly:true});    
+
+        LV_DIALOG.AddObject('label',  {val:'курс:', width:140, top:55, left:150});
+        LV_DIALOG.AddObject('edit',   {id:'rate', left:150,  top:75, width:140});    
+        
+        LV_DIALOG.AddObject('button', {id:'btnApply',  val:'Применить', height: 25, width:80, top:105, left:40,  
+                                       exe:function()
+                                                {
+                                                    var chkCreate = new FormChecker();
+                                                    var form      = document.forms['frmCurrRow'];
+
+                                                    chkCreate.AddRule('TheValueIs', form.rate, {ext:function(){return (/^[+-]?\d+\.?\d*$/.test(arguments[0]) && arguments[0] > 0)}}, 'Ошибка, неправильно задано значение курса, задайте значение больше нуля, соблюдая формат');
+                                                    chkCreate.AddRule('TheValueIs', form.base, {ext:function(){return (/^[+]?\d+$/.test(arguments[0]) && arguments[0] > 0)}}, 'Ошибка, неправильно задано значение базы курса, задайте целое число больше нуля');
+                        
+                                                    if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+                                                                                                    
+                                                    LV_DIALOG.Hide('btnApply')
+                                                }
+                                      , readonly:false
+                                      });
+        
+        LV_DIALOG.AddObject('button', {id:'btnDelete',  val:'Удалить',   height: 25, width:80, top:105, left:125, exe:function(){LV_DIALOG.Hide('btnDelete')}, readonly:false});
+        LV_DIALOG.AddObject('button', {id:'btnSkip',    val:'Сбросить',  height: 25, width:80, top:105, left:210, exe:function(){LV_DIALOG.Hide('btnSkip')}, readonly:false});
+
+        LV_DIALOG_ADD.AddListener('ON_DLG_SHOW',       function () {LV_DIALOG_ADD.error = true;});
+        LV_DIALOG_ADD.AddListener('ON_DLG_HIDE',       function () {LV_DIALOG_ADD.error = LV_TABLE.OnHide(arguments[0], arguments[1], arguments[2])});
+        LV_DIALOG_ADD.AddListener('ON_DLG_AFTER_HIDE', function () {if (!LV_DIALOG_ADD.error) ShowDialogAdd();});
+        
+        LV_DIALOG_ADD.AddObject('hidden', {id:'rowver'});
+        LV_DIALOG_ADD.AddObject('hidden', {id:'note', val:''});
+
+        LV_DIALOG_ADD.AddObject('label',  {val:'код клиринга:', width:140, top:5, left:5});
+        LV_DIALOG_ADD.AddObject('list',   {id:'code', val:LC_ARR_CLR_CODES, top:25, width:140, size:1});    
+                                      
+        LV_DIALOG_ADD.AddObject('label',  {val:'база курса:', width:140, top:5, left:150});
+        LV_DIALOG_ADD.AddObject('edit',   {id:'base', top:25, width:140, align:'right'});    
+                                      
+        LV_DIALOG_ADD.AddObject('label',  {val:'дата курса:', width:140, top:55, left:5});
+        LV_DIALOG_ADD.AddObject('date',   {id:'date', left:5,  top:75, width:140});    
+
+        LV_DIALOG_ADD.AddObject('label',  {val:'курс:', width:140, top:55, left:150});
+        LV_DIALOG_ADD.AddObject('edit',   {id:'rate', left:150,  top:75, width:140});    
+                                      
+        LV_DIALOG_ADD.AddObject('button', {id:'btnAdd', val:'Добавить', height: 25, width:80, top:105, left:210,  
+                                       exe:function()
+                                                {
+                                                    var chkCreate = new FormChecker();
+                                                    var form      = document.forms['frmNewRow'];
+
+                                                    chkCreate.AddRule('TheValueIs', form.rate, {ext:function(){return (/^[+-]?\d+\.?\d*$/.test(arguments[0]) && arguments[0] > 0)}}, 'Ошибка, неправильно задано значение курса, задайте значение больше нуля, соблюдая формат');
+                                                    chkCreate.AddRule('TheValueIs', form.base, {ext:function(){return (/^[+]?\d+$/.test(arguments[0]) && arguments[0] > 0)}}, 'Ошибка, неправильно задано значение базы курса, задайте целое число больше нуля');
+                                                                            
+                                                    if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+                                                                                                    
+                                                    LV_DIALOG_ADD.Hide('btnAdd')
+                                                }
+                                      , readonly:false
+                                      });
+    }
+    
+    window.onload = init;     
+
+    </script>
+
+</head>
+
+
+<body alink="#000099" link="#003366" vlink="#999999">
+
+<div class="body">
+<div class="page"  style="display:block" align="right">
+    <table align="right">
+        <tr>
+            <td style="background-color:#6699FF; width:50px"></td>
+            <td id="cls">значение изменено</td>
+            <td style="background-color:#FF3300; width:50px"><p></p></td>
+            <td id="cls">удаление значения</td>
+        </tr>
+        <tr>
+            <td style="background-color:#ffffcc; width:50px"><p></p></td>
+            <td id="cls">выбранная строка</td>
+            <td style="background-color:#66FF00; width:50px"><p></p></td>
+            <td id="cls">новое значение</td>
+        </tr>
+    </table>
+</div>
+
+<div id="table_corr_cln" class="page"  style="display:block">
+    <form id=frmRequest onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request %]
+    </form>
+    
+    <form id=frmUpdateData onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request replace = {exe => ['IMPORT'], lstRowver => [version.rowver]} %]
+    </form>         
+        
+    <table align="center" class="sort_table" id="show_corr">
+    <caption style="text-align:left">
+        <div class="caption" style="width:800px;text-align:center">
+            <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                [% table.description %]
+                [% IF table.period_left != undef && table.period_right != undef %]
+                    <br> за период [% table.period_left %] - [% table.period_right %]
+                [% END %]
+                <br>(записей: [% table.count %])
+            </p>
+        </div>
+    </caption>
+
+    [% PROCESS get_size_fields target='GET_DATA' %]
+
+    <thead id="show_head">
+        <tr>
+            [% PROCESS get_desc_fields target='GET_DATA' %]
+        </tr>
+    </thead>
+    <tbody id="show_body">
+            [% executor.get_body('GET_DATA') %]
+    </tbody>    
+    </table>    
+</div>
+
+</div>
+</body>
+</html>

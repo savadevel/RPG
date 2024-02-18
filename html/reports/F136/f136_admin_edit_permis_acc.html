@@ -1,0 +1,184 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Список кодов и счетов</title>
+
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"/> 
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/MultiSortTable.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/dialog.js" type="text/javascript"></script>
+    <script src="../js/reports/F136/common_show_corr.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    [% BLOCK get_permissions %]
+        [% t = 0 %]
+        [% FOREACH item IN dictionary.GET_SETTINGS %] 
+            [%- NEXT IF item.grp != 5 -%]
+            [% ',' IF t == 1 %]{id:[% item.val %], name:'[% item.note.replace('\'', '"') %]'}            
+            [% t = 1 %]
+        [%- END -%]                        
+    [%- END -%]
+
+    <script type="text/javascript">
+
+    FORMAT_OF_DATE = '[% dformat %]';
+    
+    var LV_DIALOG, LV_EDIT_TABLE, LV_MULTI_SORT, LV_SORT;
+    var LV_ACCESS    = ("[% (version.access == 2) ? 'true' : 'false' %]" == "true");
+    var LV_OBJ_ROOT  = window.addEventListener || window.attachEvent ? window : document.addEventListener ? document : null;
+    var LV_MSG_CLOSE = "Вы не сохранили изменения. Действительно хотите уйти отсюда?";
+    
+    var LC_ARR_PERMISSIONS =
+    [
+        // [% PROCESS get_permissions %]
+    ];    
+    
+    function CreateMenu() 
+    {
+        mTools = new jsDOMenu(128, "absolute");
+        
+        with (mTools) 
+        {
+            addMenuItem(new menuItem("применить", "",  "code:LV_EDIT_TABLE.Submit(frmEditPermissions);"));
+            addMenuItem(new menuItem("сортировка", "", "code: if (!LV_DIALOG.IsShow()) {LV_MULTI_SORT.Show();} else {alert('Закройте диалог редактирования параметров и повторите попытку.');}"));
+        }
+      
+        mRoot = new jsDOMenuBar("absolute", "", false);
+
+        with (mRoot) 
+        {
+            addMenuBarItem(new menuBarItem("Инструменты", mTools));
+            moveTo(-1, -1);
+        }      
+    } 
+
+    function ShowDialog(from)
+    {
+        if (LV_MULTI_SORT.IsShow())
+        {
+            alert('Закройте диалог параметров сортировки и повторите попытку.');
+            return;
+        }        
+    
+        var top = 0, left = 0;
+        
+        if (LV_DIALOG.IsShow())
+        {
+            LV_DIALOG.Hide();
+            // сохраняем позицию размещения
+            top  = LV_DIALOG.GetTop();
+            left = LV_DIALOG.GetLeft();
+        }
+        
+        var btnSkip   = LV_DIALOG.GetObject('btnSkip');
+        var btnDelete = LV_DIALOG.GetObject('btnDelete');
+        var btnApply  = LV_DIALOG.GetObject('btnApply');
+
+        btnSkip.disabled   = !LV_ACCESS || !(LV_EDIT_TABLE.canUnEdit(from));
+        btnApply.disabled  = !LV_ACCESS;                
+        
+        LV_DIALOG.Show({}, top, left, from);
+    }    
+
+    function init() 
+    {
+        var table   = show_corr;
+        
+        LV_SORT       = new CSortingOfTable(show_corr, {});        
+        LV_MULTI_SORT = new CMultiSortingOfTable(show_corr, 'frmMultiSort', {form:frmRequest});
+        LV_EDIT_TABLE = new CTableCorr(table, {});
+        LV_DIALOG     = new MyDialog('frmCurrRow', {desc:'Редактирование разрешений', width:300, height:230});
+
+        LV_EDIT_TABLE.AddListener('ON_BEFORE_SUBMIT', function () {LV_OBJ_ROOT.onbeforeunload = null;});
+        LV_SORT.AddListener('ON_AFTER_SORTING',  function () {LV_EDIT_TABLE.ReDraw()});
+        
+        LV_OBJ_ROOT.onbeforeunload = function() {if (LV_EDIT_TABLE.IsChange()) return LV_MSG_CLOSE;};        
+        
+        InitMenu();        
+        
+        LV_DIALOG.AddListener('ON_DLG_SHOW', function () {LV_EDIT_TABLE.OnShow(arguments[0], arguments[1], arguments[2], arguments[3], arguments[4])});
+        LV_DIALOG.AddListener('ON_DLG_HIDE', function () {LV_EDIT_TABLE.OnHide(arguments[0], arguments[1], arguments[2])});
+        
+        LV_DIALOG.AddObject('label', {val:'код:', width:140, top:5, left:5});
+        LV_DIALOG.AddObject('edit',  {id:'code', top:25, width:140, readonly:true, align:'center'});    
+
+        LV_DIALOG.AddObject('label', {val:'счет:', width:140, top:5, left:150});
+        LV_DIALOG.AddObject('edit',  {id:'acc', top:25, width:140, readonly:true, align:'center'}); 
+        
+        LV_DIALOG.AddObject('label', {val:'разрешения:', width:285, top:55, left:5});
+        LV_DIALOG.AddObject('blist', {id:'cando', multiple:true, width:285, top:75, size:5, val:LC_ARR_PERMISSIONS});    
+        
+        LV_DIALOG.AddObject('button', {id:'btnApply',  val:'Применить', height: 25, width:80, top:170, left:120,  exe:function(){LV_DIALOG.Hide('btnApply')} , readonly:[% (version.access == 2) ? 'false' : 'true' %]});
+        LV_DIALOG.AddObject('button', {id:'btnSkip',   val:'Сбросить',  height: 25, width:80, top:170, left:210, exe:function(){LV_DIALOG.Hide('btnSkip')}  , readonly:[% (version.access == 2) ? 'false' : 'true' %]});                                
+    }
+
+    window.onload = init;     
+
+    </script>
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999">
+
+<div class="body">
+
+<div class="page"  style="display:block" align="right">
+    <table align="right">
+        <tr>
+            <td style="background-color:#6699FF; width:50px"></td>
+            <td id="cls">значение изменено</td>
+        </tr>
+        <tr>
+            <td style="background-color:#ffffcc; width:50px"><p></p></td>
+            <td id="cls">выбранная строка</td>
+        </tr>
+    </table>
+</div>
+
+<div id="table_acc_permissions" class="page"  style="display:block">
+    <form id=frmRequest onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request %]
+    </form>
+    
+    <form id=frmEditPermissions onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request replace = {exe => ['UPDATE'], lstRowver => [version.rowver]} %]
+    </form>         
+    
+    <table align="center" class="sort_table" id="show_corr">
+    <caption style="text-align:left">
+        <div class="caption" style="width:800px;text-align:center">
+            <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                [% table.description %]
+                [% IF table.period_left != undef && table.period_right != undef %]
+                    <br> за период [% table.period_left %] - [% table.period_right %]
+                [% END %]
+                <br>(записей: [% table.count %])
+            </p>
+        </div>
+    </caption>
+
+    [% PROCESS get_size_fields target='GET_DATA' %]
+
+    <thead id="show_head">
+        <tr>
+            [% PROCESS get_desc_fields target='GET_DATA' %]
+        </tr>
+    </thead>
+    <tbody id="show_body">
+            [% executor.get_body('GET_DATA') %]
+    </tbody>    
+    </table>    
+</div>
+</div>
+</body>
+</html>

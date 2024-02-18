@@ -1,0 +1,171 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+
+    <title>Выгрузка лицевых счетов, которые имели остаток за период.</title>
+
+    <link href="../css/Spravochniks.css"  type=text/css rel=stylesheet >    
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>    
+    <script src="../js/calendar/calendar.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    
+    <script language="JavaScript" type="text/JavaScript">        
+        FORMAT_OF_DATE = '[% dformat %]';
+
+        var oRequest  = new CWaitServerRespond();
+        var oCalendar = null;
+                
+        function FormValidation(form, checker)
+        {
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+    
+            // блокирование кнопки, пока сервер не выполнит запрос
+            oRequest.start(form, function() {form.btnExecute.disabled = false;})
+            form.btnExecute.disabled = true;
+        }
+        
+        function init() 
+        {
+            oCalendar = new CCalendar('Calendar', {});
+        }
+        
+        window.onload = init;        
+    </script>    
+</head>
+
+<body alink="#000099" link="#003366" vlink='#999999' style="text-align:center">
+<div class="body">
+
+<!-- запрос остаков по л.с. -->
+<div class="page" id="query_show_sum" style="display:block">
+<!-- основной кусок -->
+    <form name=frmQuery onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SHOW_SUM" name="page">
+        <input type=hidden value="EXPORT"   name="exe">    
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков на счетах:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>        
+<!-- установка счетов -->            
+                    <fieldset><legend>Список счетов:</legend>
+                        <table style='height:114px'>
+                        <tr><td valign=middle align=center>                  
+<!-- список счетов -->
+                                <select size=15 name=lstAcc style="width: 100%"> 
+                                    [%- FOREACH item IN dictionaries.GET_ACCOUNT -%] 
+                                        <option value = [% item.acc %]>[% item.acc %]</option>
+                                    [%- END -%]
+                                </select>                   
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+
+                <td width="60%" valign="top">
+    <!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+            <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+            <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+
+                </tr>
+                <tr><td width='60%' valign='top'>                    
+<!-- выбор отображаемых полей -->                                   
+                    <fieldset><legend class="child">Дополнительная инф. по владельцу счета:</legend> 
+                        <table>                        
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkShowFields" type="checkbox"  value = "cln_desc">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>описание</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkShowFields" type="checkbox"  value = "cln_res">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>резидентность</p>
+                                </td>
+                            </tr>               
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkShowFields" type="checkbox"  value = "cln_cls">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>класс</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkShowFields" type="checkbox"  value = "cln_nmb">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>код клиента</p>
+                                </td>                                
+                            </tr>               
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>                    
+        <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQuery.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+    <script>
+        frmQuery.chkForm = new FormChecker();
+        
+        with(frmQuery)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% dates.previous %]';
+                edtDateRight.value = '[% dates.previous %]';
+            
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');            
+                AddRule('TheSelectItemMore', lstAcc, {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');                                
+            }            
+        }
+    </script>        
+</div>      
+</div>
+</body></html>

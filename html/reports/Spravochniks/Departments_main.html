@@ -1,0 +1,117 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Выгрузка подразделений Банка</title>
+
+    <link href="../css/Spravochniks.css"  type=text/css rel=stylesheet >    
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>    
+    <script src="../js/calendar/calendar.js" type="text/javascript"></script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    
+    <script language="JavaScript" type="text/JavaScript">        
+        FORMAT_OF_DATE = '[% dformat %]';
+        var oRequest   = new CWaitServerRespond();
+       
+        function FormValidation(form, checker)
+        {
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+    
+            // блокирование кнопки, пока сервер не выполнит запрос
+            oRequest.start(form, function() {form.btnExecute.disabled = false;})
+            form.btnExecute.disabled = true;
+        }
+        
+        function init() 
+        {
+        }
+        
+        window.onload = init;
+    </script>    
+</head>
+
+<body alink="#000099" link="#003366" vlink='#999999' style="text-align:center">
+<div class="body">
+
+<!-- запрос подразделений -->
+<div class="page" id="query_show_dat" style="display:block">
+<!-- основной кусок -->
+    <form name=frmQuery onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SHOW_DEP" name="page">
+        <input type=hidden value="EXPORT"   name="exe">    
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку списка подразделений Банка:</legend>
+            <table>
+            <tr><td width="40%" valign="top" rowspan='2'>
+    <!-- устанока версии-->               
+                <fieldset><legend>Список версий:</legend><div style='overflow: auto;height: 210px;width:200px'> 
+                    <table id='tabRowver' class='slim'>
+                        <colgroup><col width=15 align='center'>
+                        <colgroup><col width=150 align='left'>                
+                        [%- FOREACH item = dictionaries.GET_ROWVER %]
+                            <tr><td><input name='lstRowver' is_curr='[% item.is_curr %]' type='radio' value='[% item.rowver %]'></td><td>[% item.label %]</td></tr>
+                        [%- END %]
+                    </table>
+                </div></fieldset>
+                </td>
+            
+                <td width='60%' valign='top'>                    
+<!-- параметры выгрузки -->                                   
+                    <fieldset><legend class="child">Опции выгрузки:</legend> 
+                        <table>                        
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkTypeOfDep" type="checkbox"  value = "0">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>выгрузка ГО</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input checked name="chkTypeOfDep" type="checkbox"  value = "1">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>выгрузка филиалов</p>
+                                </td>
+                            </tr>                               
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQuery.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQuery.chkForm = new FormChecker();
+
+        with(frmQuery)
+        {
+            with(chkForm)
+            {
+                AddRule('TheCheckedItemMore',  lstRowver, {checked:1},    'Ошибка, нужно выбрать версию');                            
+                AddRule('TheCheckedItemMore',  chkTypeOfDep, {checked:1}, 'Ошибка, укажите ГО и (или) Филиалы');                            
+            }            
+        }
+         
+    </script>    
+</div>    
+</div>
+</body></html>

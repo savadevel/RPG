@@ -1,0 +1,396 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Консоль управления правами</title>
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>
+    <script src="../js/calendar/calendar.js" type="text/javascript"> </script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+    <script src="../js/dialog.js" type="text/javascript"></script>
+
+    [% PROCESS 'html_utils.tt2' %]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+    [%- BLOCK get_users -%]
+        [%- FOREACH item = dictionaries.GET_USERS %]
+            [% item.uid -%]:{login:'[% item.login.replace('\'', '"') %]', domain:'[% item.domain.replace('\'', '"') %]', name:'[% item.name.replace('\'', '"') %]'} [%- ',' IF loop.next != undef %]
+        [%- END -%]        
+    [%- END -%]
+
+    [%- BLOCK get_groups -%]
+        [%- FOREACH item = dictionaries.GET_GROUPS %]
+            '[% item.grp -%]':{type:[% item.type %], note:'[% item.note.replace('\'', '"') %]'} [%- ',' IF loop.next != undef %]
+        [%- END -%]        
+    [%- END -%]
+    
+    [%- BLOCK get_permissions -%]
+        [%- temp = {} -%]
+        [%- FOREACH item = dictionaries.GET_PERMISSIONS -%]
+            [%- uid = item.uid -%]
+            [%- IF !temp.defined(uid) -%]
+                [%- temp.$uid = [] -%]
+            [%- END -%]
+            [%- temp.item(uid).push(item.grp) -%]
+        [%- END -%]        
+        [%- FOREACH key = temp.keys %]
+            [% key %]:{'[% temp.item(key).unique.join("':1,'") %]':1} [%- ',' IF loop.next != undef %]
+        [%- END -%]
+    [%- END -%]
+    
+    <script type="text/javascript">       
+        
+        FORMAT_OF_DATE = '[% dformat %]';
+        
+        var oCurrUser;
+        var hUsers =
+        {
+        // [% PROCESS get_users %]
+        };
+
+        var hGroups =
+        {
+        // [% PROCESS get_groups %]
+        };
+
+        var hPermissions =
+        {
+        // [% PROCESS get_permissions %]
+        };
+        
+        function SetUser(obj, uid)
+        {
+            var aTables = {0:deny_groups, 1:allow_groups};
+
+            // цикл чистки списков групп
+            for (var table in aTables) 
+            {
+                // удаляем элементы списка                      
+                while(aTables[table].tBodies[0].rows.length > 0)
+                {
+                    aTables[table].tBodies[0].removeChild(aTables[table].tBodies[0].lastChild);                            
+                }
+                
+                // сбрасываем текущую group
+                aTables[table].currow = null;                                    
+            }
+            
+            // цикл заполнения списков групп
+            for(var grp in hGroups)
+            {
+                AddGroup(aTables[hPermissions[uid] && hPermissions[uid][grp] ? 1 : 0], grp);
+            }
+        
+            try
+            {
+                if (obj)
+                    obj.checked  = true;
+            }
+            catch(e)
+            {
+            }
+            
+            frmUser.uid = uid;
+        }
+
+        function FormValidation(from, checker)
+        {
+            var form = from.form;
+
+            if (form.sent) return;
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+            if (!frmUser.uid) 
+            {
+                alert('Ошибка, нужно выбрать пользователя');
+                return;
+            }
+            
+            var sMsg         = '';
+            var uid          = frmUser.uid;
+            var hAllowGroups = {};
+
+            // создаем список групп пользователя
+            for (var i = 0; i < allow_groups.tBodies[0].rows.length; i++)                
+                hAllowGroups[allow_groups.tBodies[0].rows[i].grp] = 1;
+
+            // проверка на включение в группы, в которых должен быть хотя бы
+            // один пользователь
+            // проверка на включение в группы, в которых должен быть хотя бы
+            // один пользователь
+            for (var grp in hGroups)
+            {
+                if (!(hGroups[grp].type & 0x02) || hAllowGroups[grp])
+                    continue;
+                
+                var bInc = false;
+                
+                for (var i in hPermissions)
+                {
+                    if (uid == i || !hPermissions[i][grp])
+                        continue;
+                    bInc = true;
+                    break;
+                }                
+                
+                if (bInc)
+                    continue;
+                
+                alert('Ошибка, в группу <' + hGroups[grp].note + '> должен быть включен хотя бы один пользователь');
+                return;                                
+            }
+
+            sMsg += "Внимание, будет сохранен текущий список ролей для пользователя: '" + hUsers[uid].name + "'";
+            sMsg += '\nВы уверены, что хотите продолжить?';
+            
+            if(window.confirm(sMsg))
+            {                   
+                for (var grp in hGroups)
+                {
+                    if (hAllowGroups[grp] && hPermissions[uid] && hPermissions[uid][grp])
+                        continue;
+                    
+                    var obj   = document.createElement('<input name="' + (hAllowGroups[grp] ? 'lstAllowGroups' : 'lstDenyGroups') + '" type="hidden">');
+                    obj.value = grp;
+                    form.appendChild(obj);
+                }
+            
+                form.submit();
+                form.btnEdit.disabled = true;
+                form.sent = true;
+            }
+        }
+
+        function AddGroup(table, from)
+        {
+            if (typeof(from) == 'undefined' || (typeof(from) == 'object' && !from.currow))
+                return false;
+                
+            var row, tBody = table.tBodies[0], grp = (typeof(from) != 'object' ? from : from.currow.grp);                
+                
+            // цикл по таблице групп, в которую делается вставка
+            // поиск дублей
+            for (var i = 0; i < tBody.rows.length; i++)
+                if (tBody.rows[i].grp == grp)
+                    return false;
+
+            row = tBody.insertRow();            
+            row.insertCell(); // описание группы
+            row.grp                    = grp;
+            row.firstChild.innerText   = (typeof(from) != 'object' ? hGroups[from].note : from.currow.firstChild.innerText);            
+            row.style.cursor           = 'hand';
+            row.style.background       = 'none';
+            row.style.color            = '#000000';
+            row.firstChild.style.color = '#000000';
+            
+            // в случаи переноса из одной группы в другую
+            if (typeof(from) == 'object')
+                DelGroup(from); 
+
+            // событие по которому выделяем строку
+            row.onclick = function()
+                {
+                    TurnSelectGroup(table, this);
+                    CheckAllowGroup();
+                }            
+            
+            CheckAllowGroup();
+            
+            return true;        
+        }
+        
+        function CheckAllowGroup()
+        {
+            if (!allow_groups.tBodies[0].rows.length)
+            {
+                frmUser.btnAdd.disabled = false;
+                return;
+            }
+            
+            var iCntSysGroups = 0;
+            var tBody         = allow_groups.tBodies[0]
+
+            // считаем количество системных групп текущего пользователя
+            for (var i = 0; i < tBody.rows.length; i++)
+                if (hGroups[tBody.rows[i].grp].type & 0x01)
+                    iCntSysGroups ++;
+            
+            if (iCntSysGroups)
+                frmUser.btnAdd.disabled = true;
+            else if (deny_groups.currow && hGroups[deny_groups.currow.grp].type & 0x01)
+                frmUser.btnAdd.disabled = true;
+            else
+                frmUser.btnAdd.disabled = false;                            
+        }
+        
+        function TurnSelectGroup(table, row)
+        {
+            if (table.currow)
+            {
+                // сброс текущего выделения
+                table.currow.style.background       = 'none';
+                table.currow.style.color            = '#000000';                        
+                table.currow.firstChild.style.color = '#000000';
+                
+                if (table.currow == row)
+                {
+                    // повторный клик, сбрасываем выбор
+                    table.currow = null;
+                    return;
+                }
+            }
+            
+            // выделение новой строки
+            row.style.backgroundColor  = '#000066';                             
+            row.firstChild.style.color = '#FFFFFF';
+            row.style.color            = '#FFFFFF';
+            table.currow              = row;
+        }
+
+        function DelGroup(table)
+        {
+            if (!table.currow)
+            {
+                return false;
+            }
+
+            table.tBodies[0].removeChild(table.currow);
+            table.currow = null;
+
+            return true;        
+        }
+        
+        function init() 
+        {
+            if (objCurrUser)
+                SetUser(frmUser.lstUsers[objCurrUser.index], objCurrUser.uid);        
+        }
+
+        window.onload = init; 
+
+    </script>
+
+    <style type="text/css">
+        table.nice
+        {
+            width:100%;
+            table-layout:fixed;
+            border-spacing:2;
+        }
+
+        table.nice td
+        {
+            font-size:75%;
+        }    
+
+        table.nice th
+        {
+            color:white;
+            background-color:#000066;
+            font-weight:normal;
+            text-align:center;
+        }
+
+        table.group
+        {
+            width:100%;
+            table-layout:fixed;
+        }
+
+        table.group td
+        {
+            text-align:left;
+        }                
+        
+    </style>
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class="body">
+
+<!-- просмотр-редактирование списка прав -->
+<div class="page">
+<!-- основной кусок -->
+    
+    <form name=frmUser onsubmit="return false;" action="" method=post target=''>        
+        <input type=hidden value="PERMISSIONS"  name="page">
+        <input type=hidden value=""        name="exe">
+                
+        <fieldset class='main' style='margin-top:0;text-align:left;width:100%;height:430px'>
+            <legend class='main'>Управление правами:</legend>       
+            <table class='group'>
+                <tr>
+                    <td>
+                        <fieldset><legend>Пользователи:</legend>
+                            <div style='overflow: auto;height:150px;width:100%'> 
+                                <table class='slim' width='100%'>                                
+                                    [%- FOREACH item = dictionaries.GET_USERS %]
+                                    <tr valign='top' onclick='SetUser(frmUser.lstUsers[this.rowIndex], "[% item.uid %]")'>
+                                        <td width='8%'><input name='lstUsers' id='[% item.uid %]' value='[% item.uid %]' type='radio' [% user.uid %] [% 'checked' IF user.uid == item.uid %]/></td>
+                                        <td width='25%'>[% item.name %]</td>
+                                        <td width='12%'>[% item.domain %]\[% item.login %]</td>                                        
+                                        <td width='55%'>[% item.note %]</td>
+                                    </tr>
+                                    [%- IF item.uid == show_user.uid -%]
+                                    <script type="text/javascript">
+                                        objCurrUser = {index:[% loop.index() %], uid:[% item.uid %]};                                
+                                    </script>
+                                    [%- END -%]                
+                                    [% END -%]
+                                </table>
+                            </div>                  
+                        </fieldset>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <fieldset>
+                            <table class='group'>
+                            <tr>    
+                                <td rowspan=2 valign=middle width='45%'>
+                                    Группы:<br>
+                                    <div style='border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto;height:150px;padding:3 5 3 5;margin:5 0 10 0'>
+                                        <table class='nice' id='deny_groups' width='100%'>                                            
+                                            <colgroup><col width=100% align='left'>
+                                        </table>
+                                    </div>                    
+                                </td>
+                                <td valign=bottom width='10%' style='text-align:center'>
+                                    <button name='btnAdd' title='Добавить пользователя в выбранную группу. Кнопка будет блокироваться при смешивании функциональных и системных групп.' style='width:20px;height:20px' onclick='AddGroup(allow_groups, deny_groups)'>&gt;</button>
+                                </td>
+                                <td rowspan=2 valign=middle  width='45%'>
+                                    Группы пользователя:<br>
+                                    <div style='border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto;height:150px;padding:3 5 3 5;margin:5 0 10 0'>
+                                        <table class='nice' id='allow_groups' width='100%'>
+                                            <colgroup><col width=100% align='left'>                                            
+                                        </table>
+                                    </div>                    
+                                </td>                            
+                            </tr>
+                            <tr>
+                                <td valign=top style='text-align:center'>
+                                    <button name='btnDel' title='Удалить пользователя из выбранной группы' style='width:20px;height:20px' onclick='AddGroup(deny_groups, allow_groups)'>&lt;</button>
+                                </td>
+                            </tr>                            
+                            </table>
+                        </fieldset>
+                    </td>                     
+                </tr>                
+            </table>
+            
+        </fieldset>
+        
+        <p style="margin-top:5; text-align:right">
+            <input style="width:128px" name="btnEdit"  type="submit" value="Применить" onClick="frmUser.exe.value='EDIT'; FormValidation(this, frmUser.chkEdit);">
+        </p>        
+    </form>        
+    
+    <script>
+        frmUser.chkEdit = new FormChecker();  
+    </script>    
+</div>    
+
+</div>
+</body></html>

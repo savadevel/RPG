@@ -1,0 +1,134 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>[% title %]</title>
+    
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"> 
+
+    
+    <script src="../js/utils.js" type="text/javascript"></script>
+   
+    <script src="../js/stdtypes.js" type="text/javascript"></script>       
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/show_table_data.js" type="text/javascript"></script>
+    <script src="../js/tabs.js" type="text/javascript"></script>
+    
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+
+    [%- BLOCK put_init_tabs -%]
+        
+        LV_TABS   = new CTabs('tabs', {parent:mng_tabs});
+        LV_TABLES = {};
+                    
+        LV_TABS.Add('Результат проверки', {select:true,  page:REPORT});
+        LV_TABLES['REPORT'] = {tbl:table_REPORT, order:null, view:null};
+        LV_TABS.Add('Обоснование', {select:false,  page:REPORT_EXT});
+        LV_TABLES['REPORT_EXT'] = {tbl:table_REPORT_EXT, order:null, view:null};
+            
+        for (var i in LV_TABLES)
+        {
+            with(LV_TABLES[i])
+            {
+                view  = new CTableData(tbl, {});                    
+                order = new CSortingOfTable(tbl, {});        
+                order.AddListener('ON_AFTER_SORTING',  function () {view.ReDraw()});
+            }
+        }                            
+        
+    [%- END -%]
+    
+
+    <script type="text/javascript">
+
+    var LV_SORT, LV_TABLES, LV_TABS;
+    
+
+    function init() 
+    {   
+        // [% PROCESS put_init_tabs %]
+    }
+
+    window.onload = init;     
+
+    </script>
+
+</head>
+
+<body alink="#000099" link="#003366" vlink="#999999">
+<div class="body">
+    
+    <div style='margin: 1 0 10 20;padding: 0;'>
+        <table class='tabbed' cellpadding='0' cellspacing='0'>
+            <tr>
+                <td valign='top' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+                <td valign='top' width='100%'>
+                    <img src='../img/0.gif' height='1' width='800px'/><br/>
+                    <table cellpadding='0' cellspacing='0' style='margin:10 0 0 0'>
+                        <tr><th>Версия:</th><th style='font-weight:normal;'>[% version.label %]</th></tr>
+                        <tr><th>Отчетный период:</th><th style='font-weight:normal;'>[% date2str(version.lperiod, 'date') %] - [% date2str(version.rperiod, 'date') %]</th></tr>
+                    </table>                
+                </td>
+                <td valign='top' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+            </tr>
+            <tr>
+                <td valign='bottom' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+                <td align='center' valign='bottom' width='100%'>
+                    <div class='page' id="mng_tabs" style='margin:10 0 0 0;'></div>
+                </td>
+                <td valign='bottom' width='1'><img src='../img/1.gif' height='1' width='1'/></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class='page' id='REPORT' style="display:none">
+        <table align="center" class="sort_table" id="table_REPORT">
+        <caption style="text-align:left">
+            <div class="caption" style="width:800px;text-align:center">
+                <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                    [% executor.get_title('REPORT') _ ', <br>(записей: ' _ executor.get_rows('REPORT').size _ ')' %]
+                </p>
+            </div>
+        </caption>
+
+        [% PROCESS get_size_fields target='REPORT' %]
+
+        <thead id="show_head">
+            <tr>
+                [% PROCESS get_desc_fields target='REPORT' %]
+            </tr>
+        </thead>
+        <tbody id="show_body">
+            [% executor.get_body('REPORT') %]
+        </tbody>    
+        </table>    
+    </div>
+
+    <div class='page' id='REPORT_EXT' style="display:none">
+        <table align="center" class="sort_table" id="table_REPORT_EXT">
+        <caption style="text-align:left">
+            <div class="caption" style="width:800px;text-align:center">
+                <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                    [% executor.get_title('REPORT_EXT') _ ', <br>(записей: ' _ executor.get_rows('REPORT_EXT').size _ ')' %]
+                </p>
+            </div>
+        </caption>
+
+        [% PROCESS get_size_fields target='REPORT_EXT' %]
+
+        <thead id="show_head">
+            <tr>
+                [% PROCESS get_desc_fields target='REPORT_EXT' %]
+            </tr>
+        </thead>
+        <tbody id="show_body">
+            [% executor.get_body('REPORT_EXT') %]
+        </tbody>    
+        </table>    
+    </div>         
+
+</div>
+</body>
+</html>

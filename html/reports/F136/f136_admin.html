@@ -1,0 +1,2454 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>Форма 0409136. Резервы (ежемесячная). Административная консоль.</title>
+    <link href="../css/F136.css"  type="text/css" rel="stylesheet"/>
+
+    <script src="../js/utils.js" type="text/javascript"></script>
+
+    <script src="../js/stdtypes.js" type="text/javascript"></script>
+    <script src="../js/calendar/calendar.js" type="text/javascript"> </script>
+    <script src="../js/frm_checker.js" type="text/javascript"></script>    
+    <script src="../js/dialog.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+    
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]                
+    [%- BLOCK put_rowver -%]
+        [%- FOREACH item = dictionaries.GET_ROWVER %]
+            [% item.rowver %]:{prowver:[% item.prowver %], label:'[% PROCESS txt2html text=item.label %]', parent:'[% PROCESS txt2html text=item.parent %]', cdate:'[% date2str(item.cdate, 'date') %]', edate:'[% date2str(item.edate, 'date') %]', is_fix:[% item.is_fix%], note:'[% PROCESS txt2html text=item.note %]', is_base:[% item.is_base %], is_curr:[% item.is_curr %], ldate:'[% date2str(item.ldate, 'date') %]', rdate:'[% date2str(item.rdate, 'date') %]', transfer:[% item.transfer %]} [%- ',' IF loop.next != undef %]
+        [%- END -%]        
+    [%- END -%]
+    
+    <script type="text/javascript">       
+        FORMAT_OF_DATE = '[% dformat %]';
+        
+        var oRequest   = new CWaitServerRespond();
+        var hDateRange = {left:GetSetDate('[% date2str(version.ldate, 'date') %]'), right:GetSetDate('[% date2str(version.rdate, 'date') %]')};
+        var dlgNewRowver;
+        var oCalendar  = null;
+        var hRowver    =
+        {
+        // [% PROCESS put_rowver %]
+        };
+
+        function SetRowver(obj, rowver) 
+        {
+            var aObj =
+            [
+                {obj:frmRowver.chkIsFix,        type:'checkbox',   from:'is_fix',   change:false},
+                {obj:frmRowver.chkIsCurr,       type:'checkbox',   from:'is_curr',  change:true},
+                {obj:frmRowver.chkIsUseOutSum,  type:'checkbox',   from:'transfer', change:false},
+                {obj:frmRowver.edtVerDateLeft,  type:'editbox',    from:'ldate',    change:false},                   
+                {obj:frmRowver.edtVerDateRight, type:'editbox',    from:'rdate',    change:false},
+                {obj:frmRowver.btnVerDateLeft,  type:'button',     from:undefined,  change:false},                   
+                {obj:frmRowver.btnVerDateRight, type:'button',     from:undefined,  change:false},
+                {obj:lblRowverDateCreate,       type:'label',      from:'cdate',    change:null},
+                {obj:lblRowverDateEnd,          type:'label',      from:'edate',    change:null},                
+                {obj:lblRowverName,             type:'label',      from:'label',    change:null},
+                {obj:lblRowverParentName,       type:'label',      from:'parent',   change:null},
+                {obj:frmRowver.edtNote,         type:'editbox',    from:'note',     change:false},
+                {obj:frmRowver.btnDelete,       type:'btn_delete', from:'is_base',  change:false}
+            ];
+           
+            for (var i = 0; i < aObj.length; i++)
+            {                   
+                aObj[i].obj.disabled  =  ((aObj[i].change == null)? aObj[i].obj.disabled : aObj[i].change ? false : hRowver[rowver].is_fix);
+                
+                switch(aObj[i].type)
+                {
+                    case 'editbox':
+                        aObj[i].obj.value                 = hRowver[rowver][aObj[i].from];
+                        aObj[i].obj.style.backgroundColor = ((aObj[i].change == null) ? aObj[i].obj.style.backgroundColor : (aObj[i].change || !hRowver[rowver].is_fix)? '#FFFFFF' : '#CCCCCC');
+                        break;
+
+                    case 'label':
+                        aObj[i].obj.innerHTML             = hRowver[rowver][aObj[i].from];
+                        break;
+                        
+                    case 'checkbox':
+                        aObj[i].obj.checked = hRowver[rowver][aObj[i].from];                        
+                        break;
+                        
+                    case 'btn_delete':
+//                        aObj[i].obj.disabled = hRowver[rowver][aObj[i].from];
+                        break;
+                        
+                    default:
+                        break;
+                }
+            }
+            
+            // для версии унаследованной от базовой запрещена установка признака
+            // переноса остатка
+            if (!hRowver[rowver].is_base && hRowver[hRowver[rowver].prowver].is_base)
+                frmRowver.chkIsUseOutSum.disabled = true;
+            
+            try
+            {
+                obj.checked  = true;
+            }
+            catch(e)
+            {
+            }
+
+            
+            frmRowver.rowver = rowver;
+        }
+
+        function FormRowverValidation(from, checker)
+        {
+            var form = from.form;
+
+            if (form.sent) return;
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+
+            var sMsg   = '';
+            var rowver = frmRowver.rowver;
+            
+
+            if (!rowver) 
+            {
+                alert('Ошибка, нужно выбрать версию');
+                return;
+            }
+
+            if (from.name == 'btnDelete')
+            {
+                sMsg += "Внимание, будет удалена версия '" + hRowver[rowver].label + "', продолжить?";
+            }
+            else
+            {            
+                sMsg += "Внимание, будут установлены следующие параметры версии '" + lblRowverName.innerHTML + "':";
+                sMsg += '\n   - ' + (form.chkIsCurr.checked ? 'сделать версию текущей' : 'версия не текущая');
+                
+                if (hRowver[rowver].is_fix == 0)
+                {
+                    sMsg += '\n   - ' + (form.chkIsFix.checked ? 'зафиксировать версию' : 'не фиксировать версию');
+                    sMsg += '\n   - период [' + form.edtVerDateLeft.value + ' - ' + form.edtVerDateRight.value + ']';                    
+                    sMsg += '\n   - ' + (form.chkIsUseOutSum.checked ? 'использовать исходящий остаток предыдущего отчетного периода' : 'не использовать исходящий остаток предыдущего отчетного периода');;                        
+                    sMsg += '\n   - описание \'' + form.edtNote.value + '\''; 
+                }
+
+                sMsg += '\n\nВы уверены, что хотите продолжить?';
+            }                        
+
+            
+            if(window.confirm(sMsg))
+            {
+                AddUnCheck(form, form.chkIsCurr);
+
+                if (hRowver[rowver].is_fix == 0) 
+                    AddUnCheck(form, form.chkIsUseOutSum);
+
+                form.submit();
+                form.btnEdit.disabled   = true;
+                form.btnCreate.disabled = true;
+                form.btnDelete.disabled = true;
+
+                form.sent = true;
+            }
+        }
+
+        function AddUnCheck(frm, chk)
+        {
+            if (chk.checked) return;
+
+            var obj = document.createElement('input');
+
+            obj.name  = chk.name;
+            obj.value = 0;
+            obj.type  = 'hidden';
+            frm.appendChild(obj);
+        }
+               
+        // работа с меню        
+        function TurnBlock(strID)
+        {   
+            var arr = document.getElementsByTagName('div');
+            
+            for (var i = 0; i < arr.length; i++) 
+            {
+                if (arr[i].className == 'page') 
+                {
+                    arr[i].style.display = 'none';
+                } 
+            } 
+
+            document.getElementById(strID).style.display = 'block';
+        }
+
+        function CreateMenu() 
+        {
+            var mOgress = new jsDOMenu(130, "absolute");
+
+            with (mOgress) 
+            {                
+                addMenuItem(new menuItem("Корректировка", "ext_do_corr", ""));
+                addMenuItem(new menuItem("Просмотр",      "ext_show",    ""));
+                addMenuItem(new menuItem("Коррекции",     "ext_corr", ""));
+            }
+            
+            var mOgressDoCorr = new jsDOMenu(130, "absolute");
+            mOgress.items.ext_do_corr.setSubMenu(mOgressDoCorr);
+            
+            with (mOgressDoCorr) 
+            {
+                addMenuItem(new menuItem("клиенты", "", "code:TurnBlock('query_corr_cln');"));
+                addMenuItem(new menuItem("счета",   "", "code:TurnBlock('query_corr_acc');"));
+                addMenuItem(new menuItem("остатки", "", "code:TurnBlock('query_corr_sum');"));                
+                addMenuItem(new menuItem("коды",    "", "code:TurnBlock('query_corr_cod');"));                
+            }
+                        
+            var mOgressShow = new jsDOMenu(130, "absolute");
+            mOgress.items.ext_show.setSubMenu(mOgressShow);            
+                        
+            with (mOgressShow) 
+            {                
+                addMenuItem(new menuItem("расчет кодов",  "", "code:TurnBlock('query_show_cod');"));
+                addMenuItem(new menuItem("счета",         "", "code:TurnBlock('query_show_sum');"));
+                addMenuItem(new menuItem("металлы",       "", "code:TurnBlock('query_show_cur');"));
+            }
+            
+            var mOgressCorr = new jsDOMenu(130, "absolute");
+            mOgress.items.ext_corr.setSubMenu(mOgressCorr);            
+                                    
+            with (mOgressCorr) 
+            {                
+                addMenuItem(new menuItem("клиенты",   "", "code:frmQueryOnlyCorrCln.submit();"));                
+                addMenuItem(new menuItem("счета",     "", "code:frmQueryOnlyCorrAcc.submit();"));
+                addMenuItem(new menuItem("остатки",   "", "code:frmQueryOnlyCorrSum.submit();"));
+            }  
+            
+            var mF136 = new jsDOMenu(130, "absolute");
+
+            with (mF136) 
+            {                
+                addMenuItem(new menuItem("загрузка",      "", "code:TurnBlock('import_dep');"));
+                addMenuItem(new menuItem("корректировка", "", "code:TurnBlock('query_corr_bal');"));
+                addMenuItem(new menuItem("просмотр",      "", "code:TurnBlock('query_show_bal');"));
+                addMenuItem(new menuItem("Контроль",        "ext_checks", ""));
+            }
+            
+            var mChecks = new jsDOMenu(260, "absolute");
+            mF136.items.ext_checks.setSubMenu(mChecks);            
+                        
+            with (mChecks) 
+            {                
+                //addMenuItem(new menuItem("счета 47426 по 32802", "", "code:TurnBlock('query_check_47426_by_32802');"));
+                addMenuItem(new menuItem("счета 47426 по составляющим кодам", "", "code:TurnBlock('query_check_47426n_equal_47426');"));
+            }
+            
+            var mRowver = new jsDOMenu(130, "absolute");
+            
+            with (mRowver)
+            {
+                addMenuItem(new menuItem("редактирование", "", "code:TurnBlock('query_rowver');"));
+            }
+
+            var mSett = new jsDOMenu(130, "absolute");
+            
+            with (mSett)
+            {
+                addMenuItem(new menuItem("Редактирование", "ext_sett_edit", ""));
+                addMenuItem(new menuItem("просмотр",       "", "code:TurnBlock('query_sett_other');"));
+            }
+            
+            var mSettEdit = new jsDOMenu(180, "absolute");
+            mSett.items.ext_sett_edit.setSubMenu(mSettEdit);            
+                        
+            with (mSettEdit) 
+            {                
+                addMenuItem(new menuItem("константы",               "", "code:TurnBlock('query_sett_calac');"));
+                addMenuItem(new menuItem("список кодов и счетов",   "", "code:TurnBlock('query_sett_permissions_acc');"));
+                
+            }
+            
+            var mRoot = new jsDOMenuBar("absolute", "", false);
+
+            with (mRoot) 
+            {
+                addMenuBarItem(new menuBarItem("Данные Опердня",   mOgress));
+                addMenuBarItem(new menuBarItem("Данные 136 формы", mF136));
+                addMenuBarItem(new menuBarItem("Версии",           mRowver));
+                addMenuBarItem(new menuBarItem("Параметры",        mSett));
+                moveTo(0, 0);
+            }          
+        }   
+        
+        function SetStayOptionOfList(list, iStay)
+        {
+            if (list.disabled) return;
+            for (var i = list.options.length; i > 0; i--)
+                list.options[i - 1].selected=iStay;
+        }
+        
+        function FormValidation(form, checker, question)
+        {
+            if (false == checker.CheckIt(new CheckFunctions())) return;
+            if (question && !window.confirm(question))          return;
+    
+            // блокирование кнопки, пока сервер не выполнит запрос
+            oRequest.start(form, function() {form.btnExecute.disabled = false;})
+            form.btnExecute.disabled = true;
+        }        
+        
+        function init() 
+        {
+            InitMenu();
+            TurnBlock('query_rowver');
+
+            oCalendar      = new CCalendar('Calendar', {});
+            var aLstRowver = [];
+            var aObjRowver = (frmRowver.lstRowver.length ? frmRowver.lstRowver : [frmRowver.lstRowver])
+            
+            for (var i = 0; i < aObjRowver.length;i++)
+            {
+                aLstRowver[i] = {name:hRowver[aObjRowver[i].id].label, id:aObjRowver[i].id};
+                if (aObjRowver[i].checked == true) SetRowver(aObjRowver[i], aObjRowver[i].id);
+            }                       
+
+// [%  IF checkin %]            
+            dlgNewRowver = new MyDialog('frmCreateVer', {desc:'Создание нового отчетного периода', height:280, width:525, owner:frmRowver.parentNode}); 
+
+            dlgNewRowver.AddObject('hidden',  {id:'page', val:'ROWVER'});
+            dlgNewRowver.AddObject('hidden',  {id:'exe', val:'CREATE'});
+
+            dlgNewRowver.AddObject('label', {val:'Список родительских версий:', width:200, top:15});
+            dlgNewRowver.AddObject('list',  {id:'lstParentRowver', val:aLstRowver,  width:200, size:10});    
+
+            dlgNewRowver.AddObject('label', {val:'Имя версии:', width:90, top:40, left:220});
+            dlgNewRowver.AddObject('edit',  {id:'edtLabel',  val:'', align:'left', width:202, top:40, left:310});
+
+            dlgNewRowver.AddObject('label', {val:'Отчетный период:', width:150, top:70,  left:220});
+
+            dlgNewRowver.AddObject('label', {val:'с',                width:10,  top:95, left:220});
+            dlgNewRowver.AddObject('date',  {id:'edtVerDateLeft',       width:100, top:90, left:235});
+
+            dlgNewRowver.AddObject('label', {val:'по',               width:20,  top:95, left:390});
+            dlgNewRowver.AddObject('date',  {id:'edtVerDateRight',      width:100, top:90, left:410});
+
+            dlgNewRowver.AddObject('label', {val:'Описание версии:', width:150, top:120, left:220});
+            dlgNewRowver.AddObject('text',  {id:'edtNote', val:'',   width:293, height:65, top:140});            
+
+//            dlgNewRowver.AddObject('label', {val:'Использовать исходящий остаток',  width:230,  top:198, left:220});
+//            dlgNewRowver.AddObject('checkbox',  {id:'chkIsUseOutSum', top:195, left:450});
+            
+            dlgNewRowver.AddObject('button',  {id:'btn', val:'Создать', width:80, top:220, left:433, 
+                                            exe:function()
+                                            {
+                                                var chkCreate = new FormChecker();
+                                                var form      = document.forms['frmCreateVer'];
+                    
+                                                chkCreate.AddRule('TheSelectItemMore',  form.lstParentRowver, {selected:1}, 'Ошибка, нужно выбрать родительскую версию');
+                                                chkCreate.AddRule('TheTextIsNotEmpty',  form.edtLabel,  {},           'Ошибка, не указано имя версии'); 
+                                                chkCreate.AddRule('TheContentIsNot',    form.edtLabel,  {value:hRowver, item:'label'},           'Ошибка, название версии должно быть уникально'); 
+                                                chkCreate.AddRule('RangeDate',          form.edtVerDateLeft, {oRightDate:form.edtVerDateRight, ext:function(){return (arguments[1].getTime() - arguments[0].getTime())/86400000 >= 3 }}, 'Ошибка, не правильно задан отчетный период, минимальный интервал три дня, максимум один месяц');               
+                                                                                       
+                                                if (false == chkCreate.CheckIt(new CheckFunctions())) return;
+                                                if (!window.confirm("Будет создана версия '" + form.edtLabel.value + "', продолжить?")) return;
+                                                
+                                                form.submit();  
+                                                
+                                                dlgNewRowver.Hide();
+                                                
+                                                frmRowver.btnEdit.disabled   = true;
+                                                frmRowver.btnCreate.disabled = true;
+                                                frmRowver.btnDelete.disabled = true;
+                                            }});            
+// [% END %]
+        }
+
+        window.onload = init; 
+    </script>
+</head>
+
+
+[% BLOCK get_acc -%]
+    [% tmp = {} -%]
+    [% FOREACH item IN dictionaries.GET_ACC -%]
+        [% NEXT IF chk_bit != undef && ! bin_oper(item.cando, '&', chk_bit) -%]
+        [% NEXT IF chk_cod != undef &&  chk_cod != item.code -%]
+        [% acc = item.acc -%]        
+        [% tmp.$acc = loop.index() -%]
+    [% END -%]    
+    [% FOREACH key = tmp.nsort -%]
+        <option value = [% key %] [% 'selected' IF selected != undef %]>[% key %]</option>
+    [% END -%]    
+    [% chk_bit = undef -%]
+    [% chk_cod = undef -%]
+    [% selected = undef -%]
+[% END -%]
+
+[% BLOCK get_tbl_sett -%]
+    [% FOREACH item IN dictionaries.GET_SETT -%]
+        [% NEXT IF item.grp != grp -%]
+        [% SWITCH item.type -%]
+            [% CASE ['int', 'flt', 'mny'] -%]
+                <tr><td width='[% width_val %]%'><input name='[% item.setting %]' type='edit' style='width:100%;text-align:right' value='[% item.val %]'></td><td width='[% width_label %]%'>[% item.note %]</td></tr>
+            [% CASE DEFAULT -%]
+                <tr><td width='[% width_val %]%'><input name='[% item.setting %]' type='edit' style='width:100%;text-align:left' value='[% item.val %]'></td><td width='[% width_label %]%'>[% item.note %]</td></tr>                            
+        [% END %]
+    [% END -%]    
+[% END -%]
+
+[% BLOCK get_chk_sett %]
+    [% FOREACH item IN dictionaries.GET_SETT %]
+        [%- NEXT IF item.grp != grp -%]
+        [% SWITCH item.grp %]
+            [%- CASE 1 -%]
+            AddRule('TheValueIs', [% item.setting %],  {ext:function(){return (arguments[0] >= 0 && arguments[0] < 1)}}, 'Ошибка, неправильно задано значение "[% item.note.replace('\'', '"') %]"');
+            [%- CASE 2 -%]                
+            AddRule('TheValueIs', [% item.setting %],  {ext:function(){return (/^(\w|\.|-|[А-Я]|[а-я]| )+$/.test(arguments[0]))}}, 'Ошибка, неправильно задано значение "[% item.note.replace('\'', '"') %]"');
+            [%- CASE 3 -%]
+            AddRule('TheTextIsNotEmpty', [% item.setting %],  {}, 'Ошибка, неправильно задано значение "[% item.note.replace('\'', '"') %]"');
+        [% END %]
+    [% END -%]    
+[% END -%]
+
+[% BLOCK get_cod -%]
+    [%- tmp = {} -%]
+    [%- FOREACH item IN dictionaries.GET_ACC -%]
+        [% NEXT IF chk_bit != undef && ! bin_oper(item.cando, '&', chk_bit) -%]
+        [%- code      = item.code -%]
+        [%- tmp.$code = item.code_ext -%]        
+    [%- END -%]    
+    [% FOREACH key = tmp.sort %]
+        <option value = [% key %] [% 'selected' IF selected != undef %]>[% tmp.$key %]</option>
+    [%- END -%]
+[%- END -%]
+
+[% BLOCK get_dep -%]
+    [% FOREACH item IN dictionaries.GET_DEPARTS -%]
+        [% NEXT IF chk_who != undef && chk_who != item.who -%]        
+        <option value = [% item.id %] [% 'selected' IF selected != undef %]>[% item.name %]</option>
+    [% END -%]    
+    [% selected = undef -%]
+    [% chk_who = undef -%]
+[% END %]
+
+[% BLOCK get_cls -%]
+    [%- FOREACH item IN dictionaries.GET_CLS -%]                                     
+            <option value = [% item.id %] [% 'selected' IF selected != undef %]>[% item.note %]</option>                                    
+    [%- END -%]
+    [% selected = undef -%]
+[% END %]
+
+[% BLOCK get_cur -%]
+    [%- FOREACH item IN dictionaries.list_cur -%] 
+        <option value = [% item.id %] [% 'selected' IF selected != undef %]>[% item.note %]</option>
+    [%- END -%]
+    [% selected = undef -%]
+[% END %]
+
+<body alink="#000099" link="#003366" vlink="#999999" style="text-align:center">
+<div class="body">
+
+<form name=frmQueryOnlyCorrCln onsubmit="return false;" action="" method=post target=_blank>
+    <input type=hidden value="ONLY_CORR_CLN" name="page">
+    <input type=hidden value="EXPORT" name="exe">
+    <input type=hidden value='html' name='lstOutTo'>
+</form>
+<form name=frmQueryOnlyCorrAcc onsubmit="return false;" action="" method=post target=_blank>
+    <input type=hidden value="ONLY_CORR_ACC" name="page">
+    <input type=hidden value="EXPORT" name="exe">
+    <input type=hidden value='html' name='lstOutTo'>    
+</form>
+<form name=frmQueryOnlyCorrSum onsubmit="return false;" action="" method=post target=_blank>
+    <input type=hidden value="ONLY_CORR_SUM" name="page">
+    <input type=hidden value="EXPORT" name="exe">
+    <input type=hidden value='html' name='lstOutTo'>
+</form>
+
+<!-- запрос клиентов по счетам -->
+<div class="page" id="query_corr_cln" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCorrCln onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CORR_CLN" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку атрибутов клиента(ов):</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='2'>
+        <!-- установка счетов -->                            
+                    <fieldset><legend>Список счетов:</legend>
+                        <table style='height:114px'>
+                        <tr><td width=95% valign=middle align=left>                  
+        <!-- список счетов -->
+                                <select multiple size=6 name=lstAcc style="width: 100%"> 
+                                    [% PROCESS get_acc chk_bit=1 chk_cod=undef %]
+                                </select>                   
+                            </td>
+                            <td width=5%  valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCln.lstAcc, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCln.lstAcc, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width="60%" valign="top">
+    <!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+            <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+            <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>                
+    <!-- выбор, признак резидента -->
+                    <fieldset>
+                    <legend>Признак резидента:</legend>
+                        <table style='height:39px'>
+                        <tr><td width='10%' align="right" valign="middle">
+                                <input name="chkRes" type=checkbox value="1">
+                            </td>
+                            <td width='40%' align="left" valign="middle">
+                                Резидент
+                            </td>
+                            <td width='10%' align="right" valign="middle">
+                                <input name="chkRes" type=checkbox value="0">
+                            </td>
+                            <td width='40%' align="left" valign="middle">
+                                Нерезидент
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>                                                                         
+                </td>
+                </tr>
+                <tr><td width='40%' valign='top' rowspan='2'>            
+        <!-- установка классов -->                            
+                    <fieldset><legend>Класс клиента:</legend>
+                        <table style='height:110px'>
+                        <tr><td valign=middle align=left width=95%>
+        <!-- список классов -->
+                                <select multiple size=6 name=lstCls style="width: 100%;font-family:Courier New"> 
+                                    [% PROCESS get_cls %]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCln.lstCls, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCln.lstCls, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>                
+                </td>
+                <td width="60%" valign="top">
+    <!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Информация по счетам клиента:</legend> 
+                        <table style='height:50px'>
+                        <tr><td width='10%' align="right" valign="middle">
+                                <input  name="chkShowFields" type="checkbox"  value = "acc_desc">
+                            </td>                                   
+                            <td width='40%' align='left' valign="middle">
+                                <p>описание</p>
+                            </td>
+                            <td width='10%' align="right" valign='middle'>
+                                <input  name="chkShowFields" type="checkbox"  value = "acc_msk">
+                            </td>                                   
+                            <td width='40%' align='left' valign='middle'>
+                                <p>маска</p>
+                            </td>                                
+                        </tr>               
+                            <tr><td width='10%' align='right' valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_lck">
+                                </td>                                   
+                                <td width='40%' align='left' valign="middle">
+                                    <p>состояние</p>
+                                </td>
+                                <td width='10%' align='right' valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_nmb">
+                                </td>                                   
+                                <td width='40%' align='left' valign="middle">
+                                    <p>номер счета</p>
+                                </td>                                
+                            </tr>               
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+        <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:2" onchange="frmQueryCorrCln.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCorrCln.chkForm = new FormChecker();
+        
+        with(frmQueryCorrCln)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('TheSelectItemMore', lstAcc,      {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');                                
+            }            
+        }
+    </script>    
+    
+</div>      
+
+<!-- запрос остаков по л.с. (ред.) -->
+<div class="page" id="query_corr_sum" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCorrSum onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CORR_SUM" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков для редактирования:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>
+    <!-- установка счетов -->                            
+                    <fieldset><legend>Список счетов:</legend>
+                        <table>
+                        <tr><td valign=middle align=center colspan=2>                  
+    <!-- список счетов -->
+                                <select multiple size=12 name=lstAcc style="width: 80%">                             
+                                    [% PROCESS get_acc chk_bit=2 chk_cod=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        <tr><td valign=middle align=right width="50%">
+    <!-- управление списком -->                                   
+                                <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryCorrSum.lstAcc, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                            </td>
+                            <td valign=middle align=left width="50%">
+                                <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryCorrSum.lstAcc, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>                                   
+                <td width="60%" valign="top">
+    <!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>
+    <!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Информация по счету и его владельцу:</legend> 
+                        <table>
+                            <tr><td width='10%' align='right' valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_desc">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>описание клиента</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_res">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>резидентность</p>
+                                </td>                                
+                            </tr>               
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_cls">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>класс клиента</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_msk">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>маска счета</p>
+                                </td>
+                            </tr>
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_lck">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>состояние счета</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_desc">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>описание счета</p>                                    
+                                </td>                                                                
+                            </tr>                                           
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+        <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCorrSum.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCorrSum.chkForm = new FormChecker();
+        
+        with(frmQueryCorrSum)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('TheSelectItemMore', lstAcc,      {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');                                
+            }            
+        }
+    </script>        
+</div>      
+
+<!-- запрос л.с. -->
+<div class="page" id="query_corr_acc" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCorrAcc onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CORR_ACC" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку атрибутов счетов:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>
+    <!-- установка счетов -->                                    
+                    <fieldset><legend>Список счетов:</legend>
+                        <table>
+                        <tr><td valign=middle align=center colspan=2>                  
+    <!-- список счетов -->
+                                <select multiple size=12 name=lstAcc style="width: 80%"> 
+                                    [% PROCESS get_acc chk_bit=4 chk_cod=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        <tr>
+    <!-- управление списком -->
+                            <td valign=middle align=right width="50%">
+                                <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryCorrAcc.lstAcc, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                            </td>
+                            <td valign=middle align=left width="50%">
+                                <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryCorrAcc.lstAcc, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width="60%" valign="top">
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>                    
+<!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Информация по счету и его владельцу:</legend> 
+                        <table>                        
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_desc">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>описание</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_res">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>резидентность</p>
+                                </td>                                
+                            </tr>               
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_cls">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>класс</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_code">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>назначенный код лицевому счету</p>
+                                </td>                                
+                            </tr>               
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>                    
+        <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCorrAcc.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCorrAcc.chkForm = new FormChecker();
+        
+        with(frmQueryCorrAcc)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('TheSelectItemMore', lstAcc,      {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');                                
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- запрос л.с. по коду -->
+<div class="page" id="query_corr_cod" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCorrCod onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CORR_COD" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков по кодам:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='2'>
+    <!-- установка счетов -->                            
+                    <fieldset><legend>Список счетов:</legend>
+                        <table style='height:173px' width="100%">
+                        <tr><td valign=middle align=left width=95%>                  
+    <!-- список счетов -->
+                                <select multiple size=10 name=lstAcc style="width: 100%"> 
+                                    [% PROCESS get_acc chk_bit=2 chk_cod=undef %]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCod.lstAcc, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCod.lstAcc, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width="60%" valign="top">
+                <!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>                    
+<!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Информация по счету и его владельцу:</legend> 
+                        <table>
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_desc">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>описание клиента</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_res">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>резидентность</p>
+                                </td>                                
+                            </tr>               
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_cls">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>класс клиента</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_lck">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>состояние счета</p>
+                                </td>
+                            </tr>
+                            <tr><td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_msk">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>маска счета</p>
+                                </td>
+                                <td width='10%' align='right' valign='middle'>
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_desc">
+                                </td>                                   
+                                <td width='40%' align='left' valign='middle'>
+                                    <p>описание счета</p>                                    
+                                </td>                                
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <tr><td width='40%' valign='top' rowspan='1'>                                
+    <!-- установка кодов -->                            
+                    <fieldset><legend>Список кодов:</legend>
+                        <table width="100%">
+                        <tr><td valign=middle align=left width=95%>
+    <!-- список кодов -->
+                                <select multiple size=6 name=lstCodes style="width: 100%;font-family:Courier New"> 
+                                    [% PROCESS get_cod chk_bit=2 %]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCod.lstCodes, true);"  style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryCorrCod.lstCodes, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+    <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCorrCod.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCorrCod.chkForm = new FormChecker();
+        
+        with(frmQueryCorrCod)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('SelectsItemMore', [lstAcc, lstCodes], {selected:1}, 'Ошибка, нужно выбрать счет(а) и (или) код(ы) в списках');
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- запрос кодов -->
+<div class="page" id="query_show_cod" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCod onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SHOW_COD" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков по кодам для просмотра:</legend>
+            <table>
+            <tr><td width="40%" valign="top" rowspan='2'>
+<!-- установка кодов -->                            
+                <fieldset><legend class=child>Список кодов:</legend>
+                    <table cellSpacing=0 cellPadding=0 width="100%">
+                    <tr>
+                        <td valign=middle align=center colspan=2>                  
+<!-- список валют -->
+                            <select multiple size=12 name=lstCodes style="width: 100%;font-family:Courier New"> 
+                                [% PROCESS get_cod chk_bit=undef %]
+                            </select>                   
+                        </td>
+                    </tr>
+                    <tr>
+<!-- управление списком -->
+                        <td valign=middle align=right width="50%">
+                            <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryCod.lstCodes, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                        </td>
+                        <td valign=middle align=left width="50%">
+                            <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryCod.lstCodes, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                        </td>
+                    </tr>
+                    </table>
+                </fieldset>
+                </td>
+
+                <td width="60%" valign="top">
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCod.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCod.chkForm = new FormChecker();
+        
+        with(frmQueryCod)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('TheSelectItemMore', lstCodes,    {selected:1}, 'Ошибка, нужно выбрать код(ы) в списке');                                
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- запрос металлов -->
+<div class="page" id="query_show_cur" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCur onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SHOW_CUR" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку счетов по коду валюты:</legend>
+            <table>
+            <tr><td width="40%" valign="top" rowspan='3'>
+<!-- установка металла -->                            
+                <fieldset><legend class=child>Список кодов валют:</legend>
+                    <table cellSpacing=0 cellPadding=0 width="100%">
+                    <tr>
+                        <td valign=middle align=center colspan=2>                  
+<!-- список металлов -->
+                            <select multiple size=12 name=lstCur style="width: 100%;font-family:Courier New"> 
+                                <option value="3000">MET:Драгоценные металлы</option>
+                                <option value="9033">A33:Палладий в граммах</option>
+                                <option value="9076">A76:Платина в граммах</option>
+                                <option value="9090">A90:Золото в унциях</option>
+                                <option value="9091">A91:Серебро в унциях</option>
+                                <option value="9092">A92:Платина в унциях</option>
+                                <option value="9098">A98:Золото в граммах</option>
+                                <option value="9099">A99:Серебро в граммах</option>
+                            </select>                   
+                        </td>
+                    </tr>
+                    <tr>
+<!-- управление списком -->
+                        <td valign=middle align=right width="50%">
+                            <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryCur.lstCur, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                        </td>
+                        <td valign=middle align=left width="50%">
+                            <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryCur.lstCur, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                        </td>
+                    </tr>
+                    </table>
+                </fieldset>
+                </td>
+
+                <td width="60%" valign="top">
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                        
+                <tr><td width='60%' valign='top'>                
+<!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Информация по счету и его владельцу:</legend> 
+                        <table>                        
+                            <tr><td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_desc">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>описание клиента</p>
+                                </td>
+                                <td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_res">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>резидентность</p>
+                                </td>                                
+                            </tr>               
+                            <tr><td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_cls">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>класс клиента</p>
+                                </td>
+                                <td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_msk">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>маска счета</p>
+                                </td>
+                            </tr>
+                            <tr><td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_lck">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>состояние счета</p>
+                                </td>
+                                <td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_desc">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>описание счета</p>                                    
+                                </td>                                                                
+                            </tr>                                           
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>                            
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCur.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCur.chkForm = new FormChecker();
+        
+        with(frmQueryCur)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('TheSelectItemMore', lstCur,    {selected:1}, 'Ошибка, нужно выбрать код валюты в списке');                                
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- загрузка остатков по счетам и кодам из баланса Банка -->
+<div class="page" id="import_dep" style="display:none">
+<!-- основной кусок -->        
+    <form name=frmImportDepBalance onsubmit="return false;" action="" method=post target=''>
+        <input type=hidden value="SUMM_BAL"  name="page">
+        <input type=hidden value="IMPORT"    name="exe">
+        <input type=hidden value='[% version.rowver %]' name=lstRowver>
+
+        <fieldset class='main'><legend class='main'>Параметры загрузки остатков по счетам и кодам:</legend>
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top'>
+    <!-- установка подразделений -->                            
+                    <fieldset><legend class=child>Список подразделений:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=95%>                  
+    <!-- список подразделений -->
+                                <select multiple size=7 name=lstDep style="width: 100%"> 
+                                    [% PROCESS get_dep chk_who=undef%]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmImportDepBalance.lstDep, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmImportDepBalance.lstDep, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>          
+                <td width="40%" valign="top">
+    <!-- установка счетов -->                            
+                    <fieldset><legend class=child>Список счетов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=95%>
+    <!-- список счетов -->
+                                <select multiple size=7 name=lstAcc style="width: 100%"> 
+                                    [% PROCESS get_acc chk_bit=undef chk_cod=undef %]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmImportDepBalance.lstAcc, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmImportDepBalance.lstAcc, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+            </tr>
+            <tr>
+                <td width='60%' valign='top' colspan=2>
+                    <!-- установка Кодов -->                            
+                    <fieldset style='height:160px'><legend>Список кодов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td align=left width=95%>
+                                <!-- список кодов -->
+                                <select multiple size=7 name=lstCodes style="width: 100%"> 
+                                    [% PROCESS get_cod chk_bit=undef %]
+                                </select>                   
+                            </td>
+                            <td align=center>
+                                <button onclick="SetStayOptionOfList(frmImportDepBalance.lstCodes, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmImportDepBalance.lstCodes, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+            </tr>
+            <tr>
+                <td width='60%' valign='top'>
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                    <table style='height:30;'>
+                    <tr>
+    <!-- левая граница -->
+                        <td width="5%" align="right" valign="baseline">
+                            c
+                        </td>
+                        <td width="45%" align="left" valign="baseline">         
+                            <span>
+                                <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                            </span>
+                        </td>
+    <!-- правая граница -->
+                        <td width="5%" align="right" valign="baseline">
+                            по
+                        </td>
+                        <td width="45%" align="left" valign="baseline">
+                            <span>
+                               <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                               <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                            </span>    
+                       </td>
+                    </tr>
+                    </table>
+                    </fieldset>
+                </td>
+                <td width='40%' valign='bottom'>
+<!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать отчет в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="frmImportDepBalance.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' selected value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input [% (version.access == 2) ? '' : 'disabled' %] style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmImportDepBalance.chkForm = new FormChecker();
+        
+        with(frmImportDepBalance)
+        {
+            with(chkForm)
+            {
+                var datCurr = GetCurrDate();
+
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+                
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] <= hDateRange.right && arguments[0] >= hDateRange.left))}}, 'Ошибка, неправильно задан период, задайте период входящий в отчетный');
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- запрос остаков по л.с. (прс.) -->
+<div class="page" id="query_show_sum" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryShowSum onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SHOW_SUM" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков по счетам для просмотра:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>
+    <!-- установка счетов -->                                    
+                    <fieldset><legend>Список счетов:</legend>
+                        <table>
+                        <tr><td valign=middle align=center colspan=2>                  
+    <!-- список счетов -->
+                                <select multiple size=12 name=lstAcc style="width: 80%">                             
+                                    [% PROCESS get_acc chk_bit=8 chk_cod=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        <tr><td valign=middle align=right width="50%">
+    <!-- управление списком -->                                                               
+                                <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryShowSum.lstAcc, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                            </td>
+                            <td valign=middle align=left width="50%">
+                                <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryShowSum.lstAcc, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>                                                       
+                <td width="60%" valign="top">
+    <!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>                         
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>                
+<!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Информация по счету и его владельцу:</legend> 
+                        <table>                        
+                            <tr><td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_desc">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>описание клиента</p>
+                                </td>
+                                <td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_res">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>резидентность</p>
+                                </td>                                
+                            </tr>               
+                            <tr><td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "cln_cls">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>класс клиента</p>
+                                </td>
+                                <td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_msk">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>маска счета</p>
+                                </td>
+                            </tr>
+                            <tr><td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_lck">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>состояние счета</p>
+                                </td>
+                                <td width='10%' align="right" valign="middle">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc_desc">
+                                </td>                                   
+                                <td width='40%' align="left" valign="middle">
+                                    <p>описание счета</p>                                    
+                                </td>                                                                
+                            </tr>                                           
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>
+    <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryShowSum.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryShowSum.chkForm = new FormChecker();
+        
+        with(frmQueryShowSum)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+                AddRule('TheSelectItemMore', lstAcc,    {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- выгрузка остатков по б.с. или коду -->
+<div class="page" id="query_show_bal" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryShowBal onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SHOW_BAL" name="page">
+        <input type=hidden value="EXPORT"   name="exe">
+
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков для просмотра:</legend>
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top'>
+    <!-- установка подразделений -->                            
+                    <fieldset><legend class=child>Список подразделений:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=95%>                  
+    <!-- список подразделений -->
+                                <select multiple size=7 name=lstDep style="width: 100%"> 
+                                    [% PROCESS get_dep chk_who=undef%]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryShowBal.lstDep, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryShowBal.lstDep, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>          
+                <td width="40%" valign="top">
+    <!-- установка счетов -->                            
+                    <fieldset><legend class=child>Список счетов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=95%>
+    <!-- список счетов -->
+                                <select multiple size=7 name=lstAcc style="width: 100%"> 
+                                    [% PROCESS get_acc chk_bit=undef chk_cod=undef %]
+                                </select>                   
+                            </td>
+                            <td valign=middle align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryShowBal.lstAcc, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryShowBal.lstAcc, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+            </tr>
+            <tr>
+                <td width='60%' valign='top'>
+                    <!-- установка Кодов -->                            
+                    <fieldset style='height:160px'><legend>Список кодов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td align=left width=95%>
+                                <!-- список кодов -->
+                                <select multiple size=7 name=lstCodes style="width: 100%"> 
+                                    [% PROCESS get_cod chk_bit=undef %]
+                                </select>                   
+                            </td>
+                            <td align=center>
+                                <button onclick="SetStayOptionOfList(frmQueryShowBal.lstCodes, true);" style="width:20px;height:20px" title="выбрать все"><b>+</b></button><br><br>  
+                                <button onclick="SetStayOptionOfList(frmQueryShowBal.lstCodes, false);" style="width:20px;height:20px" title="исключить всё"><b>-</b></button>
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width='40%' valign='top'>
+                    <!-- выбор уровней группировки -->                   
+                    <fieldset style='height:160px'><legend>Дополнительные поля:</legend> 
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                            <tr valign="top">
+                                <td width="15%" align="right">
+                                    <input  name="chkShowFields" type="checkbox"  value = "dep">
+                                </td>
+                                <td align="left">
+                                    <p>Подразделение</p>
+                                </td>
+                           </tr>
+                           <tr valign="top">       
+                                <td width="15%" align="right">
+                                    <input  name="chkShowFields" type="checkbox"  value = "acc">
+                                </td>                                   
+                                <td align="left">
+                                    <p>Счет 2-го порядка</p>
+                                </td>                                
+                           </tr>
+                           <tr valign="top">       
+                                <td width="15%" align="right">
+                                    <input  name="chkShowFields" type="checkbox"  value = "code">
+                                </td>                                   
+                                <td align="left">
+                                    <p>Код</p>
+                                </td>                                
+                            </tr>               
+                        </table>
+                    </fieldset> 
+                </td>
+            </tr>
+            <tr>
+                <td width='60%' valign='top'>
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                    <table style='height:30;'>
+                    <tr>
+    <!-- левая граница -->
+                        <td width="5%" align="right" valign="baseline">
+                            c
+                        </td>
+                        <td width="45%" align="left" valign="baseline">         
+                            <span>
+                                <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                            </span>
+                        </td>
+    <!-- правая граница -->
+                        <td width="5%" align="right" valign="baseline">
+                            по
+                        </td>
+                        <td width="45%" align="left" valign="baseline">
+                            <span>
+                                <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                            </span>    
+                        </td>
+                    </tr>
+                    </table>
+                    </fieldset>
+                </td>
+                <td width='40%' valign='bottom'>
+<!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="frmQueryShowBal.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryShowBal.chkForm = new FormChecker();
+        
+        with(frmQueryShowBal)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] <= hDateRange.right && arguments[0] >= hDateRange.left))}}, 'Ошибка, неправильно задан период, задайте период входящий в отчетный');
+                AddRule('SelectsItemMore', [lstAcc],     {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- выгрузка остатков по б.с. или коду для редактирования-->
+<div class="page" id="query_corr_bal" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCorrBal onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CORR_BAL" name="page">
+        <input type=hidden value="EXPORT"   name="exe">
+
+        <fieldset class='main'><legend class='main'>Параметры запроса на выгрузку остатков для редактирования:</legend>
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top'>
+    <!-- установка подразделений -->                            
+                    <fieldset><legend class=child>Список подразделений:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=100%>                  
+    <!-- список подразделений -->
+                                <select size=7 name=lstDep style="width: 100%"> 
+                                    [% PROCESS get_dep chk_who=undef%]
+                                </select>                   
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>          
+                <td width="40%" valign="top">
+    <!-- установка счетов -->                            
+                    <fieldset><legend class=child>Список счетов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=100%>
+    <!-- список счетов -->
+                                <select size=7 name=lstAcc style="width: 100%"> 
+                                    [% PROCESS get_acc chk_bit=undef chk_cod=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+            </tr>
+            <tr>
+                <td width='60%' valign='top'>
+                    <!-- установка Кодов -->                            
+                    <fieldset style='height:160px'><legend>Список кодов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td align=left width=100%>
+                                <!-- список кодов -->
+                                <select size=7 name=lstCodes style="width: 100%"> 
+                                    [% PROCESS get_cod chk_bit=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width='40%' valign='top'>
+                    <!-- Параметры выгрузки -->                   
+                    <fieldset style='height:160px'><legend>Параметры выгрузки:</legend> 
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                            <tr valign="top">
+                                <td width="15%" align="right">
+                                    <input  name="chkShowNull" type="checkbox" value=1>
+                                </td>
+                                <td align="left">
+                                    <p>Выгружать нулевые остатки</p>
+                                </td>
+                           </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+            </tr>
+            <tr>
+                <td width='60%' valign='top'>
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                    <table style='height:30;'>
+                    <tr>
+    <!-- левая граница -->
+                        <td width="5%" align="right" valign="baseline">
+                            c
+                        </td>
+                        <td width="45%" align="left" valign="baseline">         
+                            <span>
+                                <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                            </span>
+                        </td>
+    <!-- правая граница -->
+                        <td width="5%" align="right" valign="baseline">
+                            по
+                        </td>
+                        <td width="45%" align="left" valign="baseline">
+                           <span>
+                               <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                               <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                           </span>    
+                        </td>
+                    </tr>
+                    </table>
+                    </fieldset>
+                </td>
+                <td width='40%' valign='bottom'>
+<!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="frmQueryCorrBal.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCorrBal.chkForm = new FormChecker();
+        
+        with(frmQueryCorrBal)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] <= hDateRange.right && arguments[0] >= hDateRange.left))}}, 'Ошибка, неправильно задан период, задайте период входящий в отчетный');
+                AddRule('SelectsItemMore', [lstAcc], {selected:1}, 'Ошибка, нужно выбрать счет(а) в списке');                
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- просмотр-редактирование версий -->
+<div class="page" id="query_rowver" style="display:none">
+<!-- основной кусок -->
+    <form name=frmRowver onsubmit="return false;" action="" method=post target=''>        
+        <input type=hidden value="ROWVER" name="page">
+        <input type=hidden value="" name="exe">
+                
+        <fieldset class='main' style='margin-top:0;text-align:left;width:100%;height:400px'>
+            <legend class='main'>История изменений формы 0409136 (версии):</legend>       
+            <table><tr><td width='35%' valign='top'>
+        <!-- список версий  -->
+                    <fieldset>
+                        <legend>Список версий:</legend>
+                        <div style='display:block;margin:5px 0 5px 0;height:360px;border-style:inset;border-color:#CCCCCC;border-width:2px;overflow:auto'>
+                            <table class='slim'>
+                            [%- FOREACH item = dictionaries.GET_ROWVER %]
+                                <tr valign='top' onclick='SetRowver(frmRowver.lstRowver[this.rowIndex], [% item.rowver %])'>
+                                    <td width='15%'><input name='lstRowver' id=[% item.rowver %] value='[% item.rowver %]' [% 'checked' IF item.is_curr == 1 %] type='radio'/></td>
+                                    <td width='85%'>[% item.label %]</td>
+                                </tr>
+                            [% END %]
+                            </table>
+                        </div>                                
+                    </fieldset>            
+                </td>
+                
+                <td valign='top'>
+        <!-- параметры версии -->
+                <fieldset>
+                    <legend>Параметры версии:</legend>                        
+                    <table><tr>
+                        <td width="25%">
+                            Имя версии:
+                        </td>                    
+                        <td width="50%" colspan="2">            
+                            <span id='lblRowverName' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="25%">
+                            Родительская:
+                        </td>
+                        <td width="50%" colspan="2">
+                            <span id='lblRowverParentName' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="75%" colspan="3">
+                            <fieldset><legend>Отчетный период:</legend>
+                            <table style='height:30;'>
+                            <tr>
+            <!-- левая граница -->
+                                <td width="5%" align="right" valign="baseline">
+                                    c
+                                </td>
+                                <td width="45%" align="left" valign="baseline">         
+                                    <span>
+                                        <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtVerDateLeft">
+                                        <input name='btnVerDateLeft' style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtVerDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                    </span>
+                                </td>
+            <!-- правая граница -->
+                                <td width="5%" align="right" valign="baseline">
+                                    по
+                                </td>
+                                <td width="45%" align="left" valign="baseline">
+                                    <span>
+                                        <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtVerDateRight">
+                                        <input name='btnVerDateRight' style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtVerDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                    </span>    
+                                </td>
+                            </tr>
+                            </table>
+                            </fieldset>                            
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Дата создания версии:
+                        </td>
+                        <td width="25%">
+                            <span id='lblRowverDateCreate' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Версия была подписана:
+                        </td>
+                        <td width="25%">
+                            <span id='lblRowverDateEnd' class='value_off'></span>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Текущая версия:
+                        </td>
+                        <td width="25%">
+                            <input name='chkIsCurr' value=1 type='checkbox'>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Версия подписана:
+                        </td>
+                        <td width="25%">
+                            <input name='chkIsFix' value=1 type='checkbox'>
+                        </td>
+                    </tr><tr>
+                        <td width="50%" colspan="2">
+                            Использовать исходящий остаток:
+                        </td>
+                        <td width="25%">
+                            <input name='chkIsUseOutSum' value=1 type='checkbox'>
+                        </td>
+                    </tr><tr>
+                        <td colspan="3">
+                            <span>Описание версии:</span>
+                            <textarea name='edtNote' style='width:100%;margin-top:5px;height:107px'></textarea>                                    
+                        </td>
+                    </tr></table></fieldset></td>
+            </tr></table></fieldset>                
+        <p style="margin-top:5; text-align:right">
+            <input style="width:128px" name="btnEdit"  type="submit" value="Применить" onClick="frmRowver.exe.value='EDIT'; FormRowverValidation(this, frmRowver.chkEdit);">
+            <input style="width:128px;margin-left:10px" name="btnDelete" type="submit" value="Удалить" onClick="frmRowver.exe.value='DELETE'; FormRowverValidation(this, frmRowver.chkDelete);">
+            <input style="width:128px;margin-left:10px" name="btnCreate" type="submit" value="Создать" onClick="dlgNewRowver.Show({});" [%- 'disabled' IF ! checkin %]>
+        </p>        
+    </form>        
+    
+    <script>
+        frmRowver.chkEdit   = new FormChecker();  
+        frmRowver.chkDelete = new FormChecker();  
+        
+        frmRowver.chkEdit.AddRule('TheCheckedItemMore', frmRowver.lstRowver, {checked:1}, 'Ошибка, нужно выбрать версию');
+        frmRowver.chkEdit.AddRule('RangeDate',          frmRowver.edtVerDateLeft, {oRightDate:frmRowver.edtVerDateRight, ext:function(){return (arguments[1].getTime() - arguments[0].getTime())/86400000 >= 3 }}, 'Ошибка, не правильно задан отчетный период, минимальный интервал три дня, максимум один месяц');        
+        frmRowver.chkDelete.AddRule('TheCheckedItemMore', frmRowver.lstRowver, {checked:1}, 'Ошибка, нужно выбрать версию'); 
+    </script>    
+</div>    
+
+<!-- редактирование параметров представления и расчета -->
+<div class="page" id="query_sett_calac" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQuerySettCalc onsubmit="return false;" action="" method=post target=''>
+        <input type=hidden value="SETTINGS" name="page">
+        <input type=hidden value="UPDATE"  name="exe">
+        <input type=hidden value='[% version.rowver %]' name=rowver>
+
+        <fieldset class='main'><legend class='main'>Редактирование параметров формы 0409136:</legend>            
+            <table>
+                <tr>                
+                <td width='50%' valign='top'>
+                    <fieldset style='width:100%;height:100px;'>
+                    <legend>Параметры расчета:</legend>
+                    <div style='overflow: auto;height: 200px;width:285px;'> 
+                        <table class='slim'>
+                            [% PROCESS get_tbl_sett grp=1 width_val=20 width_label=80 %]
+                        </table>
+                    </div>
+                    </fieldset>
+                </td>
+                <td width='50%' valign='top'>
+                    <fieldset style='width:100%;height:100px;'>
+                    <legend>Параметры Банка:</legend>
+                    <div style='overflow: auto;height: 200px;width:285px;'> 
+                        <table class='slim'>
+                            [% PROCESS get_tbl_sett grp=3 width_val=40 width_label=60 %]
+                        </table>
+                    </div>
+                    </fieldset>
+                </td>
+                
+                </tr>
+                <tr>
+                
+                <td width='50%' valign='top'>
+                    <fieldset style='width:100%;height:100px;'>
+                    <legend>ФИО лиц утверждающих форму:</legend>
+                    <div style='overflow: auto;height: 150px;width:285px;'> 
+                        <table class='slim'>
+                            [% PROCESS get_tbl_sett grp=2 width_val=40 width_label=60 %]
+                        </table>
+                    </div>
+                    </fieldset>
+                </td>
+
+                <td width="50%" valign='top'>
+                    <fieldset style='width:100%;height:100px;'>
+                    <legend>Версии справочников:</legend>
+                    <div style='overflow: auto;height: 150px;width:285px;'> 
+                        <table class='slim'>
+                        [%- FOREACH item = dictionaries.GET_VERSPR %]
+                            <tr><td width='20%'><input name='ROWVER_SPRAVOCHNIKS' [% 'checked' IF item.is_using == 1 %] type='radio' value='[% item.rowver %]'></td><td width='80%'>[% item.label %]</td></tr>
+                        [%- END %]
+                        </table>
+                    </div>
+                    </fieldset>
+                </td>                                       
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input [% (version.access == 2) ? '' : 'disabled' %] style="width: 128px;" name="btnExecute" type="submit" value="Сохранить" onClick="FormValidation(this.form, this.form.chkForm, 'Внимание будут сохранены (обновлены) параметры формы 0409136, продолжить?');">
+        </p>        
+    </form>
+
+    <script>
+        frmQuerySettCalc.chkForm = new FormChecker();
+        
+        with(frmQuerySettCalc)
+        {
+            with(chkForm)
+            {
+                AddRule('CheckedsItemExactly', [ROWVER_SPRAVOCHNIKS], {checked:1}, 'Ошибка, нужно выбрать версию справочников');
+                // [% PROCESS get_chk_sett grp=1 %]
+                // [% PROCESS get_chk_sett grp=2 %]
+                // [% PROCESS get_chk_sett grp=3 %]
+            }            
+        }
+    </script>        
+</div>      
+
+<!-- просмотр параметров представления и расчета -->
+<div class="page" id="query_sett_other" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQuerySettOther onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SETTINGS" name="">
+        <input type=hidden value="EXPORT"  name="exe">
+
+        <fieldset class='main'><legend class='main'>Просмотр параметров формы 0409136:</legend>            
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top'>
+                    <p align=left>
+                        Тип данных:
+                        <select name=page style="width: 100%;margin-top:5">
+                            <option value=SETT_USE_ACC>Счета, участвующие в расчете страхового взноса</option>
+                            <option value=SETT_KLIKO>Параметры представления в формате ПО Kliko</option>
+                            <option value=SETT_RESERVE>Параметры представления в формате ПО "Резерв"</option>
+                            <option value=SETT_HTML>Параметры представления формы в HTML формате</option>
+                            <option value=SETT_FORMULAS>Формулы расчета</option>
+                        </select>
+                    </p>
+                </td>
+                <td width='40%' valign='bottom'>
+<!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="frmQuerySettOther.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQuerySettOther.chkForm = new FormChecker();
+        
+        with(frmQuerySettOther)
+        {
+            with(chkForm)
+            {
+            }            
+        }
+    </script>        
+</div>      
+
+<!-- выгрузка разрешений на счета -->
+<div class="page" id="query_sett_permissions_acc" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQuerySettPermissionsAcc onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="SETT_PERMISSIONS_ACC" name="page">
+        <input type=hidden value="EXPORT"   name="exe">
+
+        <fieldset class='main'><legend class='main'>Выгрузка разрешений на список кодов и счетов:</legend>
+            <table style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+            <tr>
+                <td width='60%' valign='top' rowspan='2'>
+    <!-- установка Кодов -->                            
+                    <fieldset style='height:160px'><legend>Список кодов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td align=left width=95%>
+                                <!-- список кодов -->
+                                <select multiple size=10 name=lstCodes style="width: 100%"> 
+                                    [% PROCESS get_cod chk_bit=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>          
+                <td width="40%" valign="top">
+    <!-- установка счетов -->                            
+                    <fieldset><legend class=child>Список счетов:</legend>
+                        <table cellSpacing=0 cellPadding=0 style='width:100%;margin:0 0 0 0;padding:5 10 0 0'>
+                        <tr>
+                            <td valign=middle align=left width=95%>
+    <!-- список счетов -->
+                                <select multiple size=7 name=lstAcc style="width: 100%"> 
+                                    [% PROCESS get_acc chk_bit=undef chk_cod=undef %]
+                                </select>                   
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+            </tr>
+            <tr>
+                <td width='40%' valign='bottom'>
+<!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:5" onchange="frmQuerySettPermissionsAcc.target=this.options[this.selectedIndex].form_target;">
+                            <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                            <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+            </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQuerySettPermissionsAcc.chkForm = new FormChecker();
+        
+        with(frmQuerySettPermissionsAcc)
+        {
+            with(chkForm)
+            {
+            }            
+        }
+    </script>    
+</div>      
+
+<!-- выгрузка результатов сверки остаков  -->
+<div class="page" id="query_check_47426_by_32802" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCheck47425By32802 onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CHECK_47426_BY_32802" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Контроль счета 47426 по 32802:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>
+    <!-- установка счетов -->                                    
+                    <fieldset><legend>Список подразделений:</legend>
+                        <table>
+                        <tr><td valign=middle align=center colspan=2>                  
+    <!-- список подразделений -->
+                                <select multiple size=12 name=lstDep style="width: 80%"> 
+                    [% PROCESS get_dep chk_who=undef%]                
+                                </select>                   
+                            </td>
+                        </tr>
+                        <tr>
+    <!-- управление списком -->
+                            <td valign=middle align=right width="50%">
+                                <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryCheck47425By32802.lstDep, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                            </td>
+                            <td valign=middle align=left width="50%">
+                                <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryCheck47425By32802.lstDep, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width="60%" valign="top">
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>                    
+<!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Дополнительные поля в отчете:</legend> 
+                        <table>                        
+                            <tr valign="top">
+                                <td width="15%" align="right">
+                                    <input  name="chkShowFields" type="checkbox"  value = "dep">
+                                </td>
+                                <td align="left">
+                                    <p>Подразделение</p>
+                                </td>
+                           </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>                    
+        <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCheck47425By32802.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCheck47425By32802.chkForm = new FormChecker();
+        
+        with(frmQueryCheck47425By32802)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+            }            
+        }
+    </script>    
+
+</div>      
+
+<!-- выгрузка результатов сверки остаков  -->
+<div class="page" id="query_check_47426n_equal_47426" style="display:none">
+<!-- основной кусок -->
+    <form name=frmQueryCheck47426nEqual47426 onsubmit="return false;" action="" method=post target=_blank>
+        <input type=hidden value="CHECK_47426N_EQUAL_47426" name="page">
+        <input type=hidden value="EXPORT" name="exe">
+        <fieldset class='main'><legend class='main'>Контроль счета 47426 по составляющим кодам:</legend>
+            <table>
+                <tr><td width='40%' valign='top' rowspan='3'>
+    <!-- установка счетов -->                                    
+                    <fieldset><legend>Список подразделений:</legend>
+                        <table>
+                        <tr><td valign=middle align=center colspan=2>                  
+    <!-- список подразделений -->
+                                <select multiple size=12 name=lstDep style="width: 80%"> 
+                    [% PROCESS get_dep chk_who=undef%]                
+                                </select>                   
+                            </td>
+                        </tr>
+                        <tr>
+    <!-- управление списком -->
+                            <td valign=middle align=right width="50%">
+                                <input style="padding-right:5px" id=btnSelectAll onclick="SetStayOptionOfList(frmQueryCheck47426nEqual47426.lstDep, true);" type=button value="Выбрать всё" name=btnSelectAll> 
+                            </td>
+                            <td valign=middle align=left width="50%">
+                                <input style="padding-left:5px" id=btnDeselectAll onclick="SetStayOptionOfList(frmQueryCheck47426nEqual47426.lstDep, false);" type=button value="Исключить всё" name=btnDeselectAll> 
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset>
+                </td>
+                <td width="60%" valign="top">
+<!-- устанока периода -->               
+                    <fieldset><legend>Период:</legend>
+                        <table style='height:39px'>
+                        <tr>
+        <!-- левая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                c
+                            </td>
+                            <td width="45%" align="left" valign="middle">         
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateLeft">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateLeft, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>
+                            </td>
+        <!-- правая граница -->
+                            <td width="5%" align="right" valign="middle">
+                                по
+                            </td>
+                            <td width="45%" align="left" valign="middle">
+                                <span>
+                                    <input ondblclick="oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this, dtop:-3, dleft:-2});" style='HEIGHT: 22px; WIDTH: 100px; padding-left: 3' name="edtDateRight">
+                                    <input style="POSITION: relative; TOP: -2px; LEFT: -24px; WIDTH: 20px; HEIGHT: 18px" onclick='oCalendar.IsShow(this.parentNode) ? oCalendar.Hide() : oCalendar.Show(this.parentNode, this.parentNode, {value:this.form.edtDateRight, dtop:-3, dleft:-2})' type='button' value=':::'>             
+                                </span>    
+                            </td>
+                        </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <tr><td width='60%' valign='top'>                    
+<!-- выбор отображаемых полей -->                   
+                    <fieldset><legend>Дополнительные поля в отчете:</legend> 
+                        <table>                        
+                            <tr valign="top">
+                                <td width="15%" align="right">
+                                    <input  name="chkShowFields" type="checkbox"  value = "dep">
+                                </td>
+                                <td align="left">
+                                    <p>Подразделение</p>
+                                </td>
+                           </tr>
+                        </table>
+                    </fieldset> 
+                </td>
+                </tr>
+                <td width='60%' height='100%' valign='bottom' style='margin:0; padding:0'>                    
+        <!-- выбор, куда экспортировать -->
+                    <p align=left>
+                        Экспортировать в:
+                        <select name=lstOutTo style="width: 100%;margin-top:3px" onchange="frmQueryCheck47426nEqual47426.target=this.options[this.selectedIndex].form_target;">
+                                <option form_target='_blank' selected value = html>HTML (в Internet Explorer) (*.html)</option>
+                                <option form_target='' value = excel>Microsoft Excel'97 (*.xls)</option>
+                        </select>
+                    </p>
+                </td>
+                </tr>
+            </table>
+        </fieldset>
+        <p style="margin-top:5; text-align:right">
+            <input style="width: 128px;" name="btnExecute" type="submit" value="Выполнить" onClick="FormValidation(this.form, this.form.chkForm);">
+        </p>        
+    </form>
+
+    <script>
+        frmQueryCheck47426nEqual47426.chkForm = new FormChecker();
+        
+        with(frmQueryCheck47426nEqual47426)
+        {
+            with(chkForm)
+            {
+                edtDateLeft.value  = '[% date2str(version.ldate, 'date') %]';
+                edtDateRight.value = '[% date2str(version.rdate, 'date') %]';
+
+                AddRule('RangeDate', edtDateLeft, {oRightDate:edtDateRight, ext:function(){return ((arguments[1] >= arguments[0]) && (arguments[1] < arguments[2]) && ((arguments[1].getTime() - arguments[0].getTime())/86400000 <= 35)) }}, 'Ошибка, не правильно задан период, задайте период от 1 до 35 дней не включающий и не превышающий текущей даты');
+            }            
+        }
+    </script>    
+
+</div>      
+
+
+</div>
+</body></html>

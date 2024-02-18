@@ -1,0 +1,145 @@
+[% INSERT html_doctype.tt2 %]
+<html>
+<head>
+    [% INSERT html_meta.tt2 %]    
+    <title>[% title %]</title>
+    
+    <script src="../js/utils.js" type="text/javascript"></script>
+   
+    <script src="../js/stdtypes.js" type="text/javascript"></script>   
+    <script src="../js/MultiSortTable.js" type="text/javascript"></script>
+    <script src="../js/menu/menu.js" type="text/javascript"></script>
+    <script src="../js/menu/menubar.js" type="text/javascript"></script>
+    
+    <script src="../js/SortTable.js" type="text/javascript"></script>
+    <script src="../js/show_table_data.js" type="text/javascript"></script>
+    
+    [%- PROCESS 'html_utils.tt2' -%]
+    [%- PROCESS set_errors -%]        
+    [%- PROCESS set_alerts -%]        
+
+    <script type="text/javascript">
+
+    var LV_MULTI_SORT, LV_SORT, LV_CORR_TABLE;
+
+    function CreateMenu() 
+    {
+        mTools = new jsDOMenu(130, "absolute");
+        
+        with (mTools) 
+        {
+            addMenuItem(new menuItem("сортировка", "", "code:LV_MULTI_SORT.Show();"));
+        }
+      
+        mRoot = new jsDOMenuBar("absolute", "", false);
+
+        with (mRoot) 
+        {
+            addMenuBarItem(new menuBarItem("Инструменты", mTools));
+            moveTo(-1, -1);
+        }      
+    } 
+
+    function init() 
+    {
+        var table   = show_data;
+
+        LV_CORR_TABLE = new CTableData(table, {}); 
+        LV_SORT       = new CSortingOfTable(table, {});        
+        LV_MULTI_SORT = new CMultiSortingOfTable(table, 'frmMultiSort', {form:frmLastRequest});
+
+        LV_CORR_TABLE.ReDraw();
+        LV_SORT.AddListener('ON_AFTER_SORTING',  function () {LV_CORR_TABLE.ReDraw()});        
+
+        InitMenu();        
+    }
+
+    window.onload = init;     
+
+    </script>
+
+</head>
+
+[% BLOCK get_nav_table -%]
+    [%- RETURN IF ! paging.defined('rows_on_page') -%]
+    [%- pages    = (paging.rows_on_table % paging.rows_on_page ? paging.rows_on_table div paging.rows_on_page + 1 : paging.rows_on_table div paging.rows_on_page) -%]
+    [%- IF pages > 1 -%]
+        [%- nav_cols = 10 -%]
+        [%- nav_rows = ((pages % nav_cols) == 0) ? pages div nav_cols : (pages div nav_cols) + 1 -%]
+<script type="text/javascript">
+        function GetPage(num)
+        {
+            if (!LV_MULTI_SORT) return;
+            if (frmLastRequest.sent) return;
+            if (!frmLastRequest.numPage)
+                frmLastRequest.appendChild(document.createElement("<input type='hidden' name='numPage'>"));
+
+            frmLastRequest.numPage.value =num;
+            frmLastRequest.submit();
+            frmLastRequest.sent = true;
+        }        
+</script>
+        <table align="center" class="nav_table">
+        <colgroup width='30'  align='center' span='[% nav_cols + 2 %]'></colgroup>
+        [%- page = 0 -%]
+        [% FOREACH i IN [1..nav_rows] -%]
+        <tr>
+            [% IF 1 == i -%]
+                <td rowspan='[% nav_rows %]' onClick='javascript:GetPage([% 1 == paging.current_page ? paging.current_page : paging.current_page - 1  %])'> << </td> 
+            [% END %]
+            [% WHILE page < pages -%]                
+                [% page = page + 1 -%]
+                <td onClick='javascript:GetPage([% page %])' [% "class='page_curr'" IF paging.current_page == page -%] > [% page %] </td>      
+                [% LAST IF 0 == page % nav_cols -%]          
+            [% END %]
+            [% IF 1 == i -%]
+                <td rowspan='[% nav_rows %]' onClick='javascript:GetPage([% paging.current_page == pages ? paging.current_page : paging.current_page + 1  %])'> >> </td> 
+            [% END %]
+        </tr>
+        [% END -%]
+        </table>
+        <br>
+    [%- END -%]
+[%- END -%]
+
+<body alink="#000099" link="#003366" vlink="#999999">
+<div class="body">
+
+<div id="table_cur" class="page"  style="display:block">
+    <form id=frmLastRequest onsubmit="return false;" action="" method=post target="_self">
+        [% PROCESS make_request replace={rowver => [version.rowver]} %]
+    </form>         
+
+    <table align="center" class="sort_table" id="show_data">
+    <caption style="text-align:left">
+        <div class="caption">
+            [% PROCESS  get_nav_table %]
+            <p class="tbody" style="font-weight:bold;text-align:center;display:block; width:360px; font-size:14px">
+                [%- table.description -%]
+                [%- ',<br>' _ table.period_left _ ' - ' _ table.period_right IF table.period_left.defined && table.period_right.defined -%]
+                [%- IF paging.defined('rows_on_page') -%]
+                [%- first_row = (paging.current_page - 1) * paging.rows_on_page -%]
+                <br>(с [% first_row  + (0 == table.count ? 0 : 1) %] по [% first_row + table.count %] из [% paging.rows_on_table %])
+                [%- ELSE -%]
+                [%- ',<br>(записей: ' _ table.count _ ' )' IF table.count.defined -%]
+                [%- END -%]
+            </p>
+        </div>
+    </caption>
+
+    [% PROCESS get_size_fields target='GET_DATA' %]
+
+    <thead id="show_head">
+        <tr>
+            [% PROCESS get_desc_fields target='GET_DATA' %]
+        </tr>
+    </thead>
+    <tbody id="show_body">
+            [% executor.get_body('GET_DATA') %]
+    </tbody>    
+    </table>    
+</div>
+
+</div>
+</body>
+</html>
